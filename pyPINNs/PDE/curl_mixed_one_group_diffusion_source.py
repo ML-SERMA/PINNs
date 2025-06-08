@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from ..Tools.operator import operator
 import time
 
-class curl_mixed_diffusion_one_group(pdeBase):
+class curl_mixed_one_group_diffusion_source(pdeBase):
     def __init__(self,domain,model,params_pde,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde

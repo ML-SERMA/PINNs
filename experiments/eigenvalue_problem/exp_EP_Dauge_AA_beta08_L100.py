@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_eigenvalue_one_group import mixed_eigenvalue_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_eigenvalue import mixed_one_group_diffusion_eigenvalue
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.saveResult import saveResult
@@ -26,7 +26,7 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Dauge_L100_D5_MSLR1e-3_NIT1000_HBC_AA_beta0.8_m10')
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Dauge_L100_D5_MSLR1e-3_NIT4000_HBC_AA_beta0.8_m8')
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=10*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="an integer number",default=[120,120])
@@ -67,8 +67,8 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
                 'fourier_mapping_size':None,'hard_BC':'mixed_L100'}
 
 params_solver = {'momentum':False,'beta1':0.0,'beta2':0.4,
-                'num_inner_iters':1000, 'keff_ref':0.99513,'verbose':2,
-                'anderson':True,'beta':0.8,'m':10}
+                'num_inner_iters':4000, 'keff_ref':0.99513,'verbose':2,
+                'anderson':True,'beta':0.8,'m':8}
 
 
 def func_D(X):
@@ -114,7 +114,7 @@ print('model',model_fcn)
 input('Enter')
 
 # Training Time
-mypde = mixed_eigenvalue_one_group(pdeDomain,model_fcn,params_pde,params_solver,device)
+mypde = mixed_one_group_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
 
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50000,100000,200000,300000,400000,500000], gamma=0.2)
@@ -128,11 +128,11 @@ train(mypde,pdeData,**params_train)
 
 # Model Accuracy 
 mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
-phi_REL_L2, phi_AE, phi_pred, phi_test, mass_phi = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)
-phi_REL_L2 = phi_REL_L2.cpu().detach().numpy()
-phi_AE = phi_AE.cpu().detach().numpy()
-phi_pred = phi_pred.cpu().detach().numpy()
-phi_test = phi_test.cpu().detach().numpy()
+phi_REL_L2, phi_AE, phi_pred, phi_test, mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)
+# phi_REL_L2 = phi_REL_L2.cpu().detach().numpy()
+# phi_AE = phi_AE.cpu().detach().numpy()
+# phi_pred = phi_pred.cpu().detach().numpy()
+# phi_test = phi_test.cpu().detach().numpy()
 
 # Visualization Flux
 visualization.viewErrorAndSolution(params_domain,[120,120],phi_AE,phi_pred,phi_test,save_dir)
@@ -141,7 +141,7 @@ visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi
 # Visualization currents
 show_currents = True
 if show_currents:
-    p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,mass_normalization=mass_phi)
+    p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,mass_pred= mass_phi_pred,mass_test=mass_phi_test)
     visualization.viewErrorAndCurrents(params_domain,[120,120],p_AE,p_pred,p_test,save_dir)
     # visualization.viewCrossSection(pdeData.Xc_test[0],S=p_pred[0],pathFile=save_dir+'p_pred0.png')
     # visualization.viewCrossSection(pdeData.Xc_test[1],S=p_pred[1],pathFile=save_dir+'p_pred1.png')
@@ -158,7 +158,6 @@ visualization.viewEvolutionResidual(mypde.resKeff,paramFigure={'title':'','xlabe
 saveResult.saveFigures(save_dir,'ResKeff')
 visualization.viewEvolutionResidual(mypde.resFlux,paramFigure={'title':'','xlabel':'Iteration','ylabel':'','label':'ResFlux','color':'green'})
 saveResult.saveFigures(save_dir,'ResFlux')
-
 visualization.viewEvolutionResidual(mypde.evoKeff,paramFigure={'title':'','xlabel':'Iteration','ylabel':'','label':'EvoKeff','color':'blue'})
 saveResult.saveFigures(save_dir,'EvoKeff')
 visualization.viewEvolutionResidual(mypde.accKeff,paramFigure={'title':'','xlabel':'Iteration','ylabel':'','label':'AccKeff','color':'green'})

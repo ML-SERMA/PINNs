@@ -4,26 +4,26 @@ import numpy as np
 from scipy.stats import qmc
 from ..Mesh.CartesianMesh import CartesianMesh
 
-def RandomSampling(Ncollocation, Nbounds, bounds):
-    ## Collocation points, inside domain for training
-    x = np.random.uniform(bounds[0], bounds[1], Ncollocation)
-    y = np.random.uniform(bounds[2], bounds[3], Ncollocation)
-    X_f_train = np.hstack((x.flatten()[:,None], y.flatten()[:,None]))
+# def RandomSampling(Ncollocation, Nbounds, bounds):
+#     ## Collocation points, inside domain for training
+#     x = np.random.uniform(bounds[0], bounds[1], Ncollocation)
+#     y = np.random.uniform(bounds[2], bounds[3], Ncollocation)
+#     X_f_train = np.hstack((x.flatten()[:,None], y.flatten()[:,None]))
     
-    ## Boundaries
-    ### boundaries up and down
-    x_bc_u = np.random.uniform(bounds[0], bounds[1], Nbounds)
-    y_bc_u = np.full(Nbounds, bounds[3])
-    x_bc_d = np.random.uniform(bounds[0], bounds[1], Nbounds)
-    y_bc_d = np.full(Nbounds, bounds[2])
-    ### boundaries left and right
-    y_bc_l = np.random.uniform(bounds[2], bounds[3], Nbounds)
-    x_bc_l = np.full(Nbounds, bounds[0])
-    y_bc_r = np.random.uniform(bounds[2], bounds[3], Nbounds)
-    x_bc_r = np.full(Nbounds, bounds[1])
+#     ## Boundaries
+#     ### boundaries up and down
+#     x_bc_u = np.random.uniform(bounds[0], bounds[1], Nbounds)
+#     y_bc_u = np.full(Nbounds, bounds[3])
+#     x_bc_d = np.random.uniform(bounds[0], bounds[1], Nbounds)
+#     y_bc_d = np.full(Nbounds, bounds[2])
+#     ### boundaries left and right
+#     y_bc_l = np.random.uniform(bounds[2], bounds[3], Nbounds)
+#     x_bc_l = np.full(Nbounds, bounds[0])
+#     y_bc_r = np.random.uniform(bounds[2], bounds[3], Nbounds)
+#     x_bc_r = np.full(Nbounds, bounds[1])
 
-    X_star = np.hstack((np.vstack([x_bc_u,x_bc_d,x_bc_l,x_bc_r]).flatten()[:,None], np.vstack([y_bc_u,y_bc_d,y_bc_l,y_bc_r]).flatten()[:,None]))
-    return X_f_train, X_star
+#     X_star = np.hstack((np.vstack([x_bc_u,x_bc_d,x_bc_l,x_bc_r]).flatten()[:,None], np.vstack([y_bc_u,y_bc_d,y_bc_l,y_bc_r]).flatten()[:,None]))
+#     return X_f_train, X_star
 
 def generator_points(n_samples,n_dim,random_seed=None,type_of_points='random'):
     if type_of_points == 'random':
@@ -161,33 +161,81 @@ class SquareDomain:
         
         # params_mesh = params_mesh = {'ndim':2, 'xmin':[0, 0], 'xmax':[100, 100], 'nmail':[n_test, n_test]}
         if not isinstance(n_test, list):
-            n_test = [n_test,n_test]
+            [n_test for idim in range(self.input_dim)]
 
         params_mesh = params_mesh = {'ndim':self.input_dim, 'xmin':self.min_values.tolist(), 'xmax':self.max_values.tolist(), 'nmail':n_test}
         mesh = CartesianMesh(**params_mesh)
-        X, Y     = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xmid[1]))
-        X_test   = np.hstack((X.flatten()[:,None], Y.flatten()[:,None]))  
-        x_test = torch.tensor(X_test)
+        if self.input_dim ==2 :
+            X, Y     = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xmid[1]))
+            X_test   = np.hstack((X.flatten()[:,None], Y.flatten()[:,None]))  
+            x_test = torch.tensor(X_test)
+        elif self.input_dim == 3:
+            # Create a 3D meshgrid from the midpoints along each axis
+            X, Y, Z = np.meshgrid(
+                np.array(mesh.xmid[0]),  # x-axis midpoints
+                np.array(mesh.xmid[1]),  # y-axis midpoints
+                np.array(mesh.xmid[2]),  # z-axis midpoints
+                indexing='ij'  # ensures the axes are in (x, y, z) order
+            )
+
+            # Flatten and stack into a (N, 3) array where each row is a (x, y, z) point
+            X_test = np.hstack((
+                X.flatten()[:, None],
+                Y.flatten()[:, None],
+                Z.flatten()[:, None]
+            ))
+
+            # Convert to a PyTorch tensor
+            x_test = torch.tensor(X_test, dtype=torch.float32)
+        else:
+            print('check again ndim')
         
         
         return x_test
     def add_currents_points(self,n_test):
         if not isinstance(n_test, list):
-            n_test = [n_test,n_test]
+            n_test = [n_test for idim in range(self.input_dim)]
 
         params_mesh = params_mesh = {'ndim':self.input_dim, 'xmin':self.min_values.tolist(), 'xmax':self.max_values.tolist(), 'nmail':n_test}
         mesh = CartesianMesh(**params_mesh)
+        if self.input_dim ==2:
+            # construct mesh for currents
+            Xp,Yp = np.meshgrid(np.array(mesh.xpos[0]), np.array(mesh.xmid[1]))
+            xp_test = torch.tensor(np.hstack((Xp.flatten()[:,None], Yp.flatten()[:,None])))
+            
+            Xq,Yq = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xpos[1]))
+            xq_test = torch.tensor(np.hstack((Xq.flatten()[:,None], Yq.flatten()[:,None])))
+            
+            xc_test=[xp_test,xq_test]
+        elif self.input_dim == 3:
+            # J_x: (xpos[0], xmid[1], xmid[2])
+            Xp, Yp, Zp = np.meshgrid(mesh.xpos[0], mesh.xmid[1], mesh.xmid[2], indexing='ij')
+            xp_test = torch.tensor(np.hstack((
+                Xp.flatten()[:, None],
+                Yp.flatten()[:, None],
+                Zp.flatten()[:, None]
+            )), dtype=torch.float32)
 
-        # construct mesh for currents
-        Xp,Yp = np.meshgrid(np.array(mesh.xpos[0]), np.array(mesh.xmid[1]))
-        xp_test = torch.tensor(np.hstack((Xp.flatten()[:,None], Yp.flatten()[:,None])))
+            # J_y: (xmid[0], xpos[1], xmid[2])
+            Xq, Yq, Zq = np.meshgrid(mesh.xmid[0], mesh.xpos[1], mesh.xmid[2], indexing='ij')
+            xq_test = torch.tensor(np.hstack((
+                Xq.flatten()[:, None],
+                Yq.flatten()[:, None],
+                Zq.flatten()[:, None]
+            )), dtype=torch.float32)
+
+            # J_z: (xmid[0], xmid[1], xpos[2])
+            Xr, Yr, Zr = np.meshgrid(mesh.xmid[0], mesh.xmid[1], mesh.xpos[2], indexing='ij')
+            xr_test = torch.tensor(np.hstack((
+                Xr.flatten()[:, None],
+                Yr.flatten()[:, None],
+                Zr.flatten()[:, None]
+            )), dtype=torch.float32)
+
+            # Group together
+            xc_test = [xp_test, xq_test, xr_test]
         
         
-        Xq,Yq = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xpos[1]))
-        xq_test = torch.tensor(np.hstack((Xq.flatten()[:,None], Yq.flatten()[:,None])))
-        
-        
-        xc_test=[xp_test,xq_test]
         return xc_test
         
     

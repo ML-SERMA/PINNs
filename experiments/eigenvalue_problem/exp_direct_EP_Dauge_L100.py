@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.direct_mixed_eigenvalue_one_group import direct_mixed_eigenvalue_one_group
+from pyPINNs.PDE.direct_mixed_one_group_diffusion_eigenvalue import direct_mixed_one_group_diffusion_eigenvalue
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.saveResult import saveResult
@@ -111,7 +111,7 @@ print('model',model_fcn)
 input('Enter')
 
 # Training Time
-mypde = direct_mixed_eigenvalue_one_group(pdeDomain,model_fcn,params_pde,params_solver,device)
+mypde = direct_mixed_one_group_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
 
 parameters = [*mypde.model.parameters(), mypde.keff]
 optimizer = torch.optim.Adam(parameters, lr=1.e-3,weight_decay=0.0)

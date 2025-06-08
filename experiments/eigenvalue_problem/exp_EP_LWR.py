@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_eigenvalue_one_group import mixed_eigenvalue_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_eigenvalue import mixed_one_group_diffusion_eigenvalue
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.saveResult import saveResult
@@ -45,7 +45,6 @@ save_dir = check_create_dir(results_dir+name_folder+'/')
 # Check if we run on GPU
 if torch.cuda.is_available():
     device = torch.device('cuda')
-    # torch.cuda.set_device(0)
 else:
     device = torch.device('cpu')
     
@@ -152,7 +151,7 @@ print('model',model_fcn)
 input('Enter')
 
 # Training Time
-mypde = mixed_eigenvalue_one_group(pdeDomain,model_fcn,params_pde,params_solver,device)
+mypde = mixed_one_group_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
 
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50000,100000,200000,300000,400000,500000], gamma=0.2)
@@ -166,6 +165,7 @@ train(mypde,pdeData,**params_train)
 # Model Accuracy 
 mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
 phi_REL_L2, phi_AE, phi_pred, phi_test, mass_phi = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)
+
 phi_REL_L2 = phi_REL_L2.cpu().detach().numpy()
 phi_AE = phi_AE.cpu().detach().numpy()
 phi_pred = phi_pred.cpu().detach().numpy()

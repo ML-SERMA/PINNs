@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.DDM_mixed_diffusion_one_group import DDM_mixed_diffusion_one_group
+from pyPINNs.PDE.DDM_mixed_one_group_diffusion_source import DDM_mixed_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -27,11 +27,11 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='DDM_it1000_2x1_Mixed_FCN_Constant_D1')
+parser.add_argument('-t','--test', type=str, help="name of test case",default='DDM_2x1_Mixed_FCN_Constant_D1_ns100_it2000_LR_1m3_theta_0.5_0.5')
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=5*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="an integer number",default=[60,120])
-parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=200)
+parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=1)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="an integer number",default=[2]+2*[64]+[3])
 parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
@@ -99,7 +99,7 @@ for iDD in range(nsubdo):
     summary(subdo_model_fcn[iDD], input_size=(2,))
     print('model',subdo_model_fcn[iDD])
 
-subdo_pde = [DDM_mixed_diffusion_one_group(subdo_domain[iDD],subdo_model_fcn[iDD],params_pde[iDD],device) for iDD in range(nsubdo)]
+subdo_pde = [DDM_mixed_one_group_diffusion_source(subdo_domain[iDD],subdo_model_fcn[iDD],params_pde[iDD],device) for iDD in range(nsubdo)]
 
 subdo_optimizer = [torch.optim.Adam(subdo_pde[iDD].model.parameters(), lr=1.e-3,weight_decay=0.0) for iDD in range(nsubdo)]
 subdo_scheduler = [torch.optim.lr_scheduler.MultiStepLR(subdo_optimizer[iDD], milestones=[50000,100000,200000,300000,400000,500000], gamma=0.2) for iDD in range(nsubdo)]
@@ -114,7 +114,7 @@ subdo_pde[1].g_bc = [[None,None],[None,None]]
 
 
 
-train_DDM(gridDDM=[2,1],subdo_pde=subdo_pde,subdo_data=subdo_data,params_train=params_train,n_step=1000)
+train_DDM(gridDDM=[2,1],subdo_pde=subdo_pde,subdo_data=subdo_data,params_train=params_train,n_step=20000)
 
 
 

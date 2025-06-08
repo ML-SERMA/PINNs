@@ -4,7 +4,7 @@ from .pdeBase import pdeBase
 import matplotlib.pyplot as plt
 from ..Tools.operator import operator
 
-class DS_primal_diffusion_one_group(pdeBase):
+class DS_primal_one_group_diffusion_source(pdeBase):
     def __init__(self,domain,model,params_pde,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde

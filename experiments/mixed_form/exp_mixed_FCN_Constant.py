@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_one_group import mixed_diffusion_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -26,12 +26,12 @@ print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
 parser.add_argument('-t','--test', type=str, help="name of test case",default='Mixed_FCN_Constant_D1_MSLR1e-3_2000_095_HBC')
-parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=10*1024)
+parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=50*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="an integer number",default=[120,120])
 parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=200000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
-parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="an integer number",default=[2]+7*[32]+[3])
+parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="an integer number",default=[2]+5*[64]+[3])
 parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
 parser.add_argument('-v', '--verbose',action='count', default=0)  
 
@@ -91,7 +91,7 @@ print('model',model_fcn)
 # input('Enter')
 
 # Training Time
-mypde = mixed_diffusion_one_group(pdeDomain,model_fcn,params_pde,device)
+mypde = mixed_one_group_diffusion_source(pdeDomain,model_fcn,params_pde,device)
 
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.95)

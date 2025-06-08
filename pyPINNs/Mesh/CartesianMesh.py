@@ -9,22 +9,19 @@ class CartesianMesh:
         self.xmin = xmin
         self.xmax = xmax
         self.nmail = nmail
-        #self.femOrder = femOrder
         self.nCell = np.prod(nmail)
         self.generateMesh()
 
 
     def generateMesh(self):
-        #self.pas = [np.ones(self.nmail[idim]) * (self.xmax[idim] - self.xmin[idim]) / self.nmail[idim] for idim in range(self.ndim)]
-        self.pas = [[float((self.xmax[idim] - self.xmin[idim])* 1.0/self.nmail[idim]) for _ in range(self.nmail[idim])] for idim in range(self.ndim)]
-
+        self.pas = [[float((self.xmax[idim] - self.xmin[idim])* 1.0/self.nmail[idim]) 
+                    for _ in range(self.nmail[idim])] for idim in range(self.ndim)]
         self.xpos = [[] for i in range(self.ndim)]
         for idim in range(self.ndim):
             self.xpos[idim].append(self.xmin[idim])
             for iCell in range(self.nmail[idim]):
                 self.xpos[idim].append( self.xpos[idim][iCell] + self.pas[idim][iCell] )
             self.xpos[idim][self.nmail[idim]] = self.xmax[idim]
-
 
         self.xmid = [[(self.xpos[idim][iCell] + self.xpos[idim][iCell + 1])*0.5 for iCell in range(self.nmail[idim])]
                         for idim in range(self.ndim)]
@@ -50,6 +47,7 @@ class CartesianMesh:
             for iCell in range(self.nmail[idim]):
                 self.xpos[idim].append(self.xpos[idim][-1] + self.pas[idim][iCell])
         self.xmid = [[(self.xpos[idim][iCell] + self.xpos[idim][iCell + 1])*0.5 for iCell in range(self.nmail[idim])] for idim in range(self.ndim)]
+    
     def modifyMesh(self,xpos):
         
         self.xpos = xpos
@@ -87,6 +85,9 @@ class CartesianMesh:
             for y in ys:
                 plt.plot([xs[0], xs[-1]], [y, y], color='black', alpha=.33, linestyle='-')
             plt.show()
+            
+            
+    
 
 
 

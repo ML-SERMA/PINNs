@@ -169,6 +169,71 @@ class FCN_FF(torch.nn.Module):
                 xyt = xt*yt
                 at = torch.hstack((xyt,torch.ones(x.shape[0],2).to(self.device)))
                 a = a*at
+            elif self.hard_BC == 'NTE_L1_G1':
+                
+                xt = (x[:,0:1]**2+ torch.abs(x[:,2:3]) - x[:,2:3])*((1-x[:,0:1])**2+ torch.abs(x[:,2:3]) + x[:,2:3])
+                yt = (x[:,1:2]**2+ torch.abs(x[:,3:4]) - x[:,3:4])*((1-x[:,1:2])**2+ torch.abs(x[:,3:4]) + x[:,3:4])
+                xyt = xt*yt
+                a = a*xyt
+            elif self.hard_BC == 'NTE_L1_G2':
+                
+                xt = (x[:,0:1]**2+ torch.abs(x[:,2:3]) - x[:,2:3])*((1-x[:,0:1])**2+ torch.abs(x[:,2:3]) + x[:,2:3])
+                yt = (x[:,1:2]**2+ torch.abs(x[:,3:4]) - x[:,3:4])*((1-x[:,1:2])**2+ torch.abs(x[:,3:4]) + x[:,3:4])
+                xyt = xt*yt
+                at = torch.hstack((xyt,xyt))
+                a = a*at
+            elif self.hard_BC == 'Takeda1':
+                # xt = x[:,0:1]*(25.0-x[:,0:1])/(25*25)
+                # yt = x[:,1:2]*(25.0-x[:,1:2])/(25*25)
+                # zt = x[:,2:3]*(25.0-x[:,2:3])/(25*25)
+                # phi1 = a[:,0:1]
+                # phi2 = a[:,4:5]
+                # # Gx1 = (x[:,0:1]/25.0)*(2.0/25.0*x[:,0:1]-1.0)*(0.5*phi1)
+                # # Gy1 = (x[:,1:2]/25.0)*(2.0/25.0*x[:,1:2]-1.0)*(0.5*phi1)
+                # # Gz1 = (x[:,2:3]/25.0)*(2.0/25.0*x[:,2:3]-1.0)*(0.5*phi1)
+                # # Gx2 = (x[:,0:1]/25.0)*(2.0/25.0*x[:,0:1]-1.0)*(0.5*phi2)
+                # # Gy2 = (x[:,1:2]/25.0)*(2.0/25.0*x[:,1:2]-1.0)*(0.5*phi2)
+                # # Gz2 = (x[:,2:3]/25.0)*(2.0/25.0*x[:,2:3]-1.0)*(0.5*phi2)
+                # Gx1 = (x[:,0:1]/25.0)*(0.5*phi1)
+                # Gy1 = (x[:,1:2]/25.0)*(0.5*phi1)
+                # Gz1 = (x[:,2:3]/25.0)*(0.5*phi1)
+                # Gx2 = (x[:,0:1]/25.0)*(0.5*phi2)
+                # Gy2 = (x[:,1:2]/25.0)*(0.5*phi2)
+                # Gz2 = (x[:,2:3]/25.0)*(0.5*phi2)
+                # at = torch.hstack([torch.ones(x.shape[0],1).to(self.device),xt,yt,zt,torch.ones(x.shape[0],1).to(self.device),xt,yt,zt])
+                # G  = torch.hstack([torch.zeros(x.shape[0],1).to(self.device),Gx1,Gy1,Gz1,torch.zeros(x.shape[0],1).to(self.device),Gx2,Gy2,Gz2])              
+                # a = a*at+G
+
+                L = 25.0  # Domain size
+                # Split coordinates
+                x0 = x[:, 0:1]
+                x1 = x[:, 1:2]
+                x2 = x[:, 2:3]
+
+                # Interior masking functions
+                xt = x0 * (L - x0) / (L * L)
+                yt = x1 * (L - x1) / (L * L)
+                zt = x2 * (L - x2) / (L * L)
+
+                # Fields
+                phi1 = a[:, 0:1]
+                phi2 = a[:, 4:5]
+
+                # Robin-like terms (0.5 * phi * x / L)
+                grad_weight = 0.5 / L
+                G1 = grad_weight * torch.cat([x0, x1, x2], dim=1) * phi1  # [N, 3]
+                G2 = grad_weight * torch.cat([x0, x1, x2], dim=1) * phi2  # [N, 3]
+
+                # Build modulation tensor : [N, 8]
+                ones = torch.ones_like(phi1)
+                at = torch.cat([ones, xt, yt, zt, ones, xt, yt, zt], dim=1)
+
+                # Boundary term : [N, 8]
+                zeros = torch.zeros_like(phi1)
+                G = torch.cat([zeros, G1, zeros, G2], dim=1)
+
+                # Final result
+                a = a * at + G
             else:
                 print('Type of tranformation is not implemented !')
         return a

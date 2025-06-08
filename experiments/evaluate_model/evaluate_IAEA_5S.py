@@ -10,8 +10,8 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_one_group import mixed_diffusion_one_group
-from pyPINNs.PDE.primal_diffusion_one_group import primal_diffusion_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
+from pyPINNs.PDE.primal_one_group_diffusion_source import primal_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -53,8 +53,8 @@ print(f"Running on {device}. Yes! ")
 
 params_domain = {'xmin':[0, 0], 'xmax':[96, 86],'boundary_conditions': [['VACUUM', 'VACUUM'],['VACUUM', 'VACUUM']]}
 params_data = {'n_collocation':args.n_collocation,'n_boundary':args.n_boundary,'n_test':args.n_test,'random_seed':2024,'device':device}
-params_model = {'layers': [2]+5*[64]+[3],'activation':args.activation,'device':device,'fourier_mapping_size':None,'hard_BC':'mixed_vacuum_96_86'}
-# params_model_f = {'layers': [2]+5*[64]+[3],'activation':args.activation,'device':device,'fourier_mapping_size':None,'hard_BC':'mixed_vacuum_96_86'}
+params_model_c = {'layers': [2]+5*[64]+[3],'activation':'celu','device':device,'fourier_mapping_size':None,'hard_BC':'mixed_vacuum_96_86'}
+params_model_f = {'layers': [2]+5*[64]+[3],'activation':'sin','device':device,'fourier_mapping_size':None,'hard_BC':'mixed_vacuum_96_86'}
 
 def func_D(X):
     x=X[:,0:1]
@@ -120,8 +120,8 @@ visualization.viewCrossSection(pdeData.X_train,func_Source(pdeData.X_train),path
 
 
 
-model_fcn_c  = FCN_FF(**params_model).to(device)
-model_fcn_f = FCN_FF(**params_model).to(device)
+model_fcn_c  = FCN_FF(**params_model_c).to(device)
+model_fcn_f = FCN_FF(**params_model_f).to(device)
 
 summary(model_fcn_c, input_size=(2,))
 summary(model_fcn_f, input_size=(2,))
@@ -130,8 +130,8 @@ summary(model_fcn_f, input_size=(2,))
 
 
 # Training Time
-mypde_c  = mixed_diffusion_one_group(pdeDomain,model_fcn_c,params_pde,device)
-mypde_f = mixed_diffusion_one_group(pdeDomain,model_fcn_f,params_pde,device)
+mypde_c  = mixed_one_group_diffusion_source(pdeDomain,model_fcn_c,params_pde,device)
+mypde_f = mixed_one_group_diffusion_source(pdeDomain,model_fcn_f,params_pde,device)
 
 # optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.95)
@@ -141,11 +141,11 @@ mypde_f = mixed_diffusion_one_group(pdeDomain,model_fcn_f,params_pde,device)
 
 
 # Model Accuracy 
-mypde_c.model.load_state_dict(torch.load(save_dir+"model_nr10240.pt"))
-mypde_f.model.load_state_dict(torch.load(save_dir+"model_nr20480.pt"))
+mypde_c.model.load_state_dict(torch.load(save_dir+"model_LHS_Celu.pt"))
+mypde_f.model.load_state_dict(torch.load(save_dir+"model_Sobol_Sin.pt"))
 
-phi_REL_L2_c, phi_AE_c, phi_pred_c, phi_test_c,_ = mypde_c.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
-phi_REL_L2_f, phi_AE_f, phi_pred_f, phi_test_f,_ = mypde_f.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
+phi_REL_L2_c, phi_AE_c, phi_pred_c, phi_test_c,_,_ = mypde_c.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
+phi_REL_L2_f, phi_AE_f, phi_pred_f, phi_test_f,_,_ = mypde_f.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
 
 minE = torch.min(torch.stack([torch.min(phi_AE_c),torch.min(phi_AE_f)]))
 print(f"==>> minE: {minE}")
@@ -162,10 +162,10 @@ print(f"==>> maxF: {maxF}")
 
 
 # Visualization Flux
-visualization.viewErrorAndSolution(params_domain,[96,86],phi_AE_c,phi_pred_c,phi_test_c,save_dir,
-                                   name='error_phi_test_10240.png',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
-visualization.viewErrorAndSolution(params_domain,[96,86],phi_AE_f,phi_pred_f,phi_test_f,save_dir,
-                                   name='error_phi_test_20480.png',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
+visualization.viewErrorAndSolutionScale(params_domain,[96,86],phi_AE_c,phi_pred_c,phi_test_c,save_dir,
+                                name='error_phi_test_LHS_Celu.pdf',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
+visualization.viewErrorAndSolutionScale(params_domain,[96,86],phi_AE_f,phi_pred_f,phi_test_f,save_dir,
+                                name='error_phi_test_Sobol_Sin.pdf',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
 
 gapError = torch.abs(phi_pred_c-phi_pred_f)
 visualization.viewSolution(params_domain,[96,86],gapError,pathFile=save_dir+'gapError.png')

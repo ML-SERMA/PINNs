@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from ..Tools.operator import operator
 from ..Tools.multiGroupLoss import multiGroupLoss
 
-class mixed_diffusion_two_group(pdeBase):
+class mixed_two_group_diffusion_source(pdeBase):
     def __init__(self,domain,model,params_pde,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde
@@ -35,6 +35,7 @@ class mixed_diffusion_two_group(pdeBase):
         eq_g2_c = 1.0/D2*p2 + operator.grad(phi2,X)
         
         eq = torch.hstack((eq_g1_c,eq_g1_f,eq_g2_c,eq_g2_f))
+        # eq = torch.hstack((eq_g1_f,eq_g2_f,eq_g1_c,eq_g2_c))
         
         return eq
     

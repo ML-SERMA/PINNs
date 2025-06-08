@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_one_group import mixed_diffusion_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -105,7 +105,7 @@ print('model',model_fcn)
 input('Enter')
 
 # Training Time
-mypde = mixed_diffusion_one_group(pdeDomain,model_fcn,params_pde,device)
+mypde = mixed_one_group_diffusion_source(pdeDomain,model_fcn,params_pde,device)
 
 parameters = [*mypde.model.parameters(), *model_D.parameters()]
 

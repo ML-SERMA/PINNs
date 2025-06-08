@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.DDM_mixed_diffusion_one_group import DDM_mixed_diffusion_one_group
+from pyPINNs.PDE.DDM_mixed_one_group_diffusion_source import DDM_mixed_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -27,11 +27,11 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='DDM_it_LRA_2x2_Mixed_FCN_Constant_D1')
+parser.add_argument('-t','--test', type=str, help="name of test case",default='DDM_2x2_Mixed_FCN_Constant_D1_ns100_it20000_LR_1m3_theta_0.5_0.5')
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=3*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="an integer number",default=[60,60])
-parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=2000)
+parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=100)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="an integer number",default=[2]+2*[64]+[3])
 parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
@@ -63,13 +63,13 @@ params_domain = [{'xmin':[0, 0], 'xmax':[0.5, 0.5],'boundary_conditions': [['ZER
 
 params_data = nsubdo*[{'n_collocation':args.n_collocation,'n_boundary':args.n_boundary,'n_test':args.n_test,'random_seed':2024,'device':device}]
 params_train = [{'n_step':args.n_step,'verbose':args.verbose,'log_every':args.log_every,'LossFile':'Loss_0.csv','save_dir':save_dir,
-                    'learning_rate_annealing':True,'mode':'a'},
+                    'learning_rate_annealing':False,'mode':'a'},
                 {'n_step':args.n_step,'verbose':args.verbose,'log_every':args.log_every,'LossFile':'Loss_1.csv','save_dir':save_dir,
-                    'learning_rate_annealing':True,'mode':'a'},
+                    'learning_rate_annealing':False,'mode':'a'},
                 {'n_step':args.n_step,'verbose':args.verbose,'log_every':args.log_every,'LossFile':'Loss_2.csv','save_dir':save_dir,
-                    'learning_rate_annealing':True,'mode':'a'},
+                    'learning_rate_annealing':False,'mode':'a'},
                 {'n_step':args.n_step,'verbose':args.verbose,'log_every':args.log_every,'LossFile':'Loss_3.csv','save_dir':save_dir,
-                    'learning_rate_annealing':True,'mode':'a'}
+                    'learning_rate_annealing':False,'mode':'a'}
                 ]
 params_model = [{'layers':args.n_neuron,'activation':args.activation,'device':device,'fourier_mapping_size':None,'hard_BC': 'mixed_L1_LD'},
                 {'layers':args.n_neuron,'activation':args.activation,'device':device,'fourier_mapping_size':None,'hard_BC': 'mixed_L1_RD'},
@@ -109,7 +109,7 @@ for iDD in range(nsubdo):
     summary(subdo_model_fcn[iDD], input_size=(2,))
     print('model',subdo_model_fcn[iDD])
 
-subdo_pde = [DDM_mixed_diffusion_one_group(subdo_domain[iDD],subdo_model_fcn[iDD],params_pde[iDD],device) for iDD in range(nsubdo)]
+subdo_pde = [DDM_mixed_one_group_diffusion_source(subdo_domain[iDD],subdo_model_fcn[iDD],params_pde[iDD],device) for iDD in range(nsubdo)]
 
 subdo_optimizer = [torch.optim.Adam(subdo_pde[iDD].model.parameters(), lr=1.e-3,weight_decay=0.0) for iDD in range(nsubdo)]
 subdo_scheduler = [torch.optim.lr_scheduler.StepLR(subdo_optimizer[iDD],step_size=2000, gamma=0.95) for iDD in range(nsubdo)]
@@ -129,7 +129,7 @@ subdo_pde[3].g_bc = [[None,None],[None,None]]
 
 
 
-train_DDM(gridDDM=[2,2],subdo_pde=subdo_pde,subdo_data=subdo_data,params_train=params_train,n_step=100)
+train_DDM(gridDDM=[2,2],subdo_pde=subdo_pde,subdo_data=subdo_data,params_train=params_train,n_step=20000)
 
 
 

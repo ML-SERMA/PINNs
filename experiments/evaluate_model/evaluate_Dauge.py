@@ -10,8 +10,8 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_one_group import mixed_diffusion_one_group
-from pyPINNs.PDE.primal_diffusion_one_group import primal_diffusion_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
+from pyPINNs.PDE.primal_one_group_diffusion_source import primal_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -93,8 +93,8 @@ summary(model_fcn_primal, input_size=(2,))
 
 
 # Training Time
-mypde_mixed  = mixed_diffusion_one_group(pdeDomain,model_fcn_mixed,params_pde,device)
-mypde_primal = primal_diffusion_one_group(pdeDomain,model_fcn_primal,params_pde,device)
+mypde_mixed  = mixed_one_group_diffusion_source(pdeDomain,model_fcn_mixed,params_pde,device)
+mypde_primal = primal_one_group_diffusion_source(pdeDomain,model_fcn_primal,params_pde,device)
 
 # optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.95)
@@ -107,8 +107,8 @@ mypde_primal = primal_diffusion_one_group(pdeDomain,model_fcn_primal,params_pde,
 mypde_mixed.model.load_state_dict(torch.load(save_dir+"model_mixed.pt"))
 mypde_primal.model.load_state_dict(torch.load(save_dir+"model_primal.pt"))
 
-phi_REL_L2_mixed, phi_AE_mixed, phi_pred_mixed, phi_test_mixed,_ = mypde_mixed.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
-phi_REL_L2_primal, phi_AE_primal, phi_pred_primal, phi_test_primal,_ = mypde_primal.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
+phi_REL_L2_mixed, phi_AE_mixed, phi_pred_mixed, phi_test_mixed,_,_ = mypde_mixed.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
+phi_REL_L2_primal, phi_AE_primal, phi_pred_primal, phi_test_primal,_,_ = mypde_primal.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
 
 minE = torch.min(torch.stack([torch.min(phi_AE_mixed),torch.min(phi_AE_primal)]))
 print(f"==>> minE: {minE}")
@@ -125,10 +125,10 @@ print(f"==>> maxF: {maxF}")
 
 
 # Visualization Flux
-visualization.viewErrorAndSolution(params_domain,[120,120],phi_AE_mixed,phi_pred_mixed,phi_test_mixed,save_dir,
-                                name='error_phi_test_mixed.png',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
-visualization.viewErrorAndSolution(params_domain,[120,120],phi_AE_primal,phi_pred_primal,phi_test_primal,save_dir,
-                                name='error_phi_test_primal.png',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
+visualization.viewErrorAndSolutionScale(params_domain,[120,120],phi_AE_mixed,phi_pred_mixed,phi_test_mixed,save_dir,
+                                name='error_phi_test_mixed.pdf',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
+visualization.viewErrorAndSolutionScale(params_domain,[120,120],phi_AE_primal,phi_pred_primal,phi_test_primal,save_dir,
+                                name='error_phi_test_primal.pdf',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
 
 # p_REL_L2_mixed ,p_AE_mixed, p_pred_mixed, p_test_mixed = mypde_mixed.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=False)
 # visualization.viewErrorAndCurrents(params_domain,[120,120],p_AE_mixed,p_pred_mixed,p_test_mixed,save_dir,name='error_current_test_mixed.png')

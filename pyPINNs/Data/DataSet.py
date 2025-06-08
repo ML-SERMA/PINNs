@@ -3,6 +3,8 @@ import torch
 from torch.utils.data import DataLoader
 import pickle
 from ..Mesh.CartesianMesh import CartesianMesh
+from ..Tools.quadrature import quadrature
+
 
 class DataSet:
     def __init__(self,domain,n_collocation,n_boundary,n_test,random_seed,device):
@@ -104,28 +106,6 @@ class DataSet:
                 print('Set default value for p_test')
                 self.p_test = None       
             
-    # def generate_phi_test_multigroups(self,load_dir=None):
-    #     if load_dir is not None:
-    #         print('Load reference solution!')
-    #         phi_test   = pickle.load(open(load_dir,"rb"))[0] # for one subdomain
-    #         ngroup = phi_test.shape[0]
-    #         self.phi_test   = [torch.tensor(phi_test[ig], requires_grad=False).float().to(self.device) for ig in range(ngroup)]
-
-            
-    # def generate_p_test_multigroups(self,load_dir=None):
-        
-    #     if load_dir is not None:
-    #         print('Load reference currents!')
-    #         p_test   = pickle.load(open(load_dir,"rb"))[0] # for one  subdomain
-    #         print(f"==>> p_test: {p_test}")
-    #         ngroup = len(p_test)
-    #         self.p_test   = [ [torch.tensor(p_test[ig][idim], requires_grad=False).float().to(self.device) 
-    #                         for idim in range(self.domain.input_dim)] for ig in range(ngroup)]
-    #         print(f"==>> self.p_test: {self.p_test}")
-
-    #     else:
-    #         print('Set default value for p_test')
-    #         self.p_test = None       
 
         
     def prepare_DataLoader(self,batch_size_collocation=None,batch_size_boundary=None): ## Do not use this function for the moment!
@@ -150,6 +130,54 @@ class DataSet:
 
         self.X_exp = self.X_test.clone().detach().requires_grad_(True)
         self.phi_exp = self.phi_test
+
+    def generate_angular_collocation_points(self,n_mu=4,n_phi=4,dim_angular=2,mu_rule ='legendre',phi_rule='legendre'):
+        self.s_train,_ = quadrature.angular_quadrature(n_mu=n_mu,n_phi=n_phi,dim_angular=dim_angular,
+                                                    mu_rule = mu_rule,phi_rule=phi_rule,device=self.device)
+        
+    def generate_angular_boundary_points(self,n_mu=4,n_phi=4,dim_angular=2,mu_rule ='legendre',phi_rule='legendre'):
+        self.s_bc,_ = quadrature.angular_quadrature(n_mu=n_mu,n_phi=n_phi,dim_angular=dim_angular,
+                                                    mu_rule = mu_rule,phi_rule=phi_rule,device=self.device)   
+    def combine_space_angular_points(self,mode='auto'):
+        '''
+        This function is used to combine space points and angular points for the multigroup neutron transport equation
+
+        '''
+        assert self.X_train.shape[1] == self.s_train.shape[1], "Mismatch in spatial/angular dimensions"
+        if mode == 'paired' and self.X_train.shape[0] == self.s_train.shape[0]:
+            print(f"==>>  mode train: {mode}")
+            xs_train = torch.cat([self.X_train, self.s_train], dim=1)
+        else:
+            # Repeat the angular directions for each input point
+            x_in = self.X_train.repeat_interleave(self.s_train.shape[0], dim=0) # [N × Q_train, d]
+            s_in = self.s_train.repeat(self.n_collocation, 1)                # [N × Q_train, d]
+            xs_train = torch.cat([x_in, s_in], dim=1)      # [N × Q_train, 2d] 
+
+        self.X_train =  xs_train.requires_grad_().float().to(self.device) 
+        # for boundary points
+        XS_bc = []
+        for dim in range(len(self.X_bc)):
+            XS_bc_dim = []
+            for side in range(2):  # 0: min side, 1: max side
+                x_b = self.X_bc[dim][side]  # [N, d]
+                if mode == 'paired' and x_b.shape[0] == self.s_bc.shape[0]:
+                    print(f"==>>  mode bc: {mode}")
+                    xs_bc = torch.cat([x_b, self.s_bc], dim=1)
+                else:
+                    # Repeat directions and spatial points
+                    x_in = x_b.repeat_interleave(self.s_bc.shape[0], dim=0)       # [N*Q, d]
+                    s_in = self.s_bc.repeat(x_b.shape[0], 1)                   # [N*Q, d]
+                    xs_bc = torch.cat([x_in, s_in], dim=1)  # [N*Q, 2d]
+                XS_bc_dim.append(xs_bc)    
+            XS_bc.append(XS_bc_dim)
+
+        self.X_bc = [ [XS_bc[idim][id].requires_grad_().float().to(self.device) for id in range(2)] for idim in range(len(XS_bc))]
+        
+        
+
+
+
+
 
 
     

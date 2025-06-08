@@ -5,6 +5,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 import pandas as pd
 import matplotlib.colors as colors
+import pyvista as pv
+import torch
 
 class visualization:
     @staticmethod
@@ -61,7 +63,7 @@ class visualization:
                 plt.savefig(pathFile)
     
     @staticmethod
-    def viewErrorAndSolutionScale(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.png',vminE=None,vmaxE=None,vminF=None,vmaxF=None):
+    def viewErrorAndSolutionScale(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.pdf',vminE=None,vmaxE=None,vminF=None,vmaxF=None):
         x_bound_low = params_domain['xmin'][0]
         x_bound_up  = params_domain['xmax'][0]
         y_bound_low = params_domain['xmin'][1]
@@ -79,8 +81,8 @@ class visualization:
         ax1 = plt.subplot(1, 3, 1)
         shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth',norm=normE, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
         plt.colorbar(shw1)
-        plt.xlabel('X')
-        plt.ylabel('Y')
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$x_2$')
         # plt.colorbar(shw1,ax=ax1)
         ax1.set_title("Absolute Error")
 
@@ -89,8 +91,8 @@ class visualization:
         ax2 = plt.subplot(1, 3, 2)
         shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
         plt.colorbar(shw2)
-        plt.xlabel('X')
-        plt.ylabel('Y')    
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$x_2$')
         ax2.set_title("Predicted Solution")
 
 
@@ -98,8 +100,8 @@ class visualization:
         ax3 = plt.subplot(1, 3, 3)
         shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
         plt.colorbar(shw3)
-        plt.xlabel('X')
-        plt.ylabel('Y')  
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$x_2$') 
         ax3.set_title("Reference Solution")
         plt.tight_layout()
         plt.savefig(save_dir+name)
@@ -110,8 +112,8 @@ class visualization:
             fig, ax = plt.subplots()
             shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth',norm=normE, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
             plt.colorbar(shw1)
-            plt.xlabel('X')
-            plt.ylabel('Y')
+            plt.xlabel(r'$x_1$')
+            plt.ylabel(r'$x_2$')
             plt.tight_layout()
             # ax.set_title("Absolute Error")
             plt.savefig(save_dir+'AE_'+name)
@@ -119,8 +121,8 @@ class visualization:
             fig, ax = plt.subplots()
             shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
             plt.colorbar(shw2)
-            plt.xlabel('X')
-            plt.ylabel('Y')   
+            plt.xlabel(r'$x_1$')
+            plt.ylabel(r'$x_2$')
             plt.tight_layout() 
             # ax.set_title("Predicted Solution")
             plt.savefig(save_dir+'Predicted_'+name)
@@ -128,14 +130,14 @@ class visualization:
             fig, ax = plt.subplots()
             shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
             plt.colorbar(shw3)
-            plt.xlabel('X')
-            plt.ylabel('Y')  
+            plt.xlabel(r'$x_1$')
+            plt.ylabel(r'$x_2$')
             plt.tight_layout()
             # ax.set_title("Reference Solution")
             plt.savefig(save_dir+'Reference_'+name)
             
     @staticmethod
-    def viewErrorAndSolution(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.png'):
+    def viewErrorAndSolution(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.pdf'):
         x_bound_low = params_domain['xmin'][0]
         x_bound_up  = params_domain['xmax'][0]
         y_bound_low = params_domain['xmin'][1]
@@ -151,8 +153,8 @@ class visualization:
         ax1 = plt.subplot(1, 3, 1)
         shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
         plt.colorbar(shw1)
-        plt.xlabel('X')
-        plt.ylabel('Y')
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$x_2$')
         # plt.colorbar(shw1,ax=ax1)
         ax1.set_title("Absolute Error")
 
@@ -161,8 +163,8 @@ class visualization:
         ax2 = plt.subplot(1, 3, 2)
         shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
         plt.colorbar(shw2)
-        plt.xlabel('X')
-        plt.ylabel('Y')    
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$x_2$')
         ax2.set_title("Predicted Solution")
 
 
@@ -170,8 +172,8 @@ class visualization:
         ax3 = plt.subplot(1, 3, 3)
         shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
         plt.colorbar(shw3)
-        plt.xlabel('X')
-        plt.ylabel('Y')  
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$x_2$')
         ax3.set_title("Reference Solution")
         plt.tight_layout()
         plt.savefig(save_dir+name)
@@ -182,8 +184,8 @@ class visualization:
             fig, ax = plt.subplots()
             shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
             plt.colorbar(shw1)
-            plt.xlabel('X')
-            plt.ylabel('Y')
+            plt.xlabel(r'$x_1$')
+            plt.ylabel(r'$x_2$')
             plt.tight_layout()
             # ax.set_title("Absolute Error")
             plt.savefig(save_dir+'AE_'+name)
@@ -191,8 +193,8 @@ class visualization:
             fig, ax = plt.subplots()
             shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
             plt.colorbar(shw2)
-            plt.xlabel('X')
-            plt.ylabel('Y')   
+            plt.xlabel(r'$x_1$')
+            plt.ylabel(r'$x_2$')
             plt.tight_layout() 
             # ax.set_title("Predicted Solution")
             plt.savefig(save_dir+'Predicted_'+name)
@@ -200,8 +202,8 @@ class visualization:
             fig, ax = plt.subplots()
             shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
             plt.colorbar(shw3)
-            plt.xlabel('X')
-            plt.ylabel('Y')  
+            plt.xlabel(r'$x_1$')
+            plt.ylabel(r'$x_2$')
             plt.tight_layout()
             # ax.set_title("Reference Solution")
             plt.savefig(save_dir+'Reference_'+name)
@@ -243,24 +245,78 @@ class visualization:
             df.plot(x='Iter',y='Loss_BC',ax=axes[1],loglog=True)
             df.plot(x='Iter',y='Loss_PDE',ax=axes[2],loglog=True)
             plt.savefig(save_dir+'loss_train.png')
+    @staticmethod
+    def show_history_residuals(pathFile,save_dir,keff_ref_exist=False):
+
+        if keff_ref_exist:
+            df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','keff', 'resKeff', 'resFlux','innerSolver','resIS','accKeff'])
+            fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(10, 8))
+            axes = axes.flatten()
+            df.plot(x='Iter', y='keff', ax=axes[0], loglog=True, title='keff')
+            df.plot(x='Iter', y='accKeff', ax=axes[1], loglog=True, title='Accuracy keff')
+            df.plot(x='Iter', y='resKeff', ax=axes[2], loglog=True, title='Residual keff')
+            df.plot(x='Iter', y='resFlux', ax=axes[3], loglog=True, title='Residual Flux')
+            df.plot(x='Iter', y='innerSolver', ax=axes[4], loglog=True, title='Inner Solver')
+            df.plot(x='Iter', y='resIS', ax=axes[5], loglog=True, title='res IS')
+            for ax in axes:
+                ax.grid(True)
+            fig.tight_layout()
+            plt.savefig(save_dir + 'history_residuals_full.png')
+            plt.close()
+        else:
+            df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','keff', 'resKeff', 'resFlux','innerSolver','resIS'])
+            fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 8))
+            axes = axes.flatten()
+            df.plot(x='Iter', y='keff', ax=axes[0], loglog=True, title='keff')
+            df.plot(x='Iter', y='resKeff', ax=axes[1], loglog=True, title='Residual keff')
+            df.plot(x='Iter', y='resFlux', ax=axes[2], loglog=True, title='Residual Flux')
+            df.plot(x='Iter', y='innerSolver', ax=axes[3], loglog=True, title='Inner Solver')
+            for ax in axes:
+                ax.grid(True)
+            fig.tight_layout()
+            plt.savefig(save_dir + 'history_residuals.png')
+            plt.close()
+
+
 
     @staticmethod
     def viewSolution(params_domain,n_test,u,pathFile):
-        x_bound_low = params_domain['xmin'][0]
-        x_bound_up  = params_domain['xmax'][0]
-        y_bound_low = params_domain['xmin'][1]
-        y_bound_up  = params_domain['xmax'][1]
-        num_test_x = n_test[0]
-        num_test_y = n_test[1]
+        ndim = len(params_domain['xmin'])
+        if ndim ==2 :
+            x_bound_low = params_domain['xmin'][0]
+            x_bound_up  = params_domain['xmax'][0]
+            y_bound_low = params_domain['xmin'][1]
+            y_bound_up  = params_domain['xmax'][1]
+            num_test_x = n_test[0]
+            num_test_y = n_test[1]
 
-
-        fig = plt.figure(frameon=False)
-        shw1 = plt.imshow(u.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw1)
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.tight_layout()
-        plt.savefig(pathFile)
+            fig = plt.figure(frameon=False)
+            shw1 = plt.imshow(u.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+            plt.colorbar(shw1)
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.tight_layout()
+            plt.savefig(pathFile)
+        if ndim == 3:
+            x_bound_low = params_domain['xmin'][0]
+            x_bound_up  = params_domain['xmax'][0]
+            y_bound_low = params_domain['xmin'][1]
+            y_bound_up  = params_domain['xmax'][1]
+            z_bound_low = params_domain['xmin'][2]
+            z_bound_up  = params_domain['xmax'][2]
+            num_test_x = n_test[0]
+            num_test_y = n_test[1]
+            num_test_z = n_test[2]
+            M = u.cpu().detach().numpy().reshape((num_test_x, num_test_y,num_test_z), order="F")
+            index_z = n_test[2]//2
+            M_slice = M[:,:,index_z]
+            fig = plt.figure(frameon=False)
+            shw1 = plt.imshow(M_slice.T, cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+            plt.colorbar(shw1)
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.tight_layout()
+            plt.savefig(pathFile)
         
     @staticmethod
     def viewEvolutionResidual(totalListResidual, paramFigure={'title':'','xlabel':'','ylabel':'','label':'','color':'blue'}):
@@ -337,6 +393,69 @@ class visualization:
         plt.ylabel('Y')  
         ax6.set_title("Reference Solution")
         plt.savefig(save_dir+name)
+        
+    @staticmethod
+    def export_flux_list(mesh, flux_list, filename="flux_data.vtr"):
+        """
+        Export multiple flux arrays on a structured Cartesian mesh.
+        
+        Args:
+            mesh: Object with attribute `edges`, a list of 1D arrays for each dim (x_edges, y_edges, [z_edges]).
+            flux_list: List of 2D or 3D flux arrays matching mesh cell count.
+            filename: Output filename (should end with .vtr for 3D, .vts for 2D).
+        """
+        
+        # Convert edges to NumPy arrays on CPU
+        edges = []
+        for e in mesh.edges:
+            if torch.is_tensor(e):
+                edges.append(e.detach().cpu().numpy())
+            else:
+                edges.append(np.asarray(e))
+
+        ndims = len(edges)  # 2 or 3
+
+        if ndims not in (2, 3):
+            raise ValueError(f"Mesh edges dimension should be 2 or 3, got {ndims}")
+
+        # Number of cells per dimension = len(edges[d]) - 1
+        shape = tuple(len(e) - 1 for e in edges)  # e.g. (nx, ny, nz) or (nx, ny)
+
+        # Create the PyVista structured grid (RectilinearGrid)
+        if ndims == 2:
+            # For 2D, add a singleton z dimension
+            x_edges, y_edges = edges
+            z_edges = np.array([0, 1])  # dummy edges in z to create 3D grid with thickness 1
+            grid = pv.RectilinearGrid(x_edges, y_edges, z_edges)
+        else:
+            x_edges, y_edges, z_edges = edges
+            grid = pv.RectilinearGrid(x_edges, y_edges, z_edges)
+
+        # Add each flux array as cell data
+        for idx, flux in enumerate(flux_list, 1):
+            # Convert flux to NumPy on CPU
+            if torch.is_tensor(flux):
+                flux_np = flux.detach().cpu().numpy()
+            else:
+                flux_np = np.asarray(flux)
+                
+            # Reshape flux to (nx, ny, [nz]) accordingly
+            try:
+                flux_reshaped = flux_np.reshape(shape, order='F')
+            except Exception as e:
+                raise ValueError(f"Flux index {idx} cannot be reshaped to mesh shape {shape}: {e}")
+
+            # Flatten in Fortran order for VTK
+            flux_flat = flux_reshaped.flatten(order='F')
+
+            # Add to cell data with generic name
+            name = f"flux_{idx}"
+            grid.cell_data[name] = flux_flat
+
+        # Save grid
+        grid.save(filename)
+        print(f"Saved {len(flux_list)} flux fields to '{filename}'")
+
 
 
 

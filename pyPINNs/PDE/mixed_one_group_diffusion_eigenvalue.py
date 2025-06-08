@@ -6,7 +6,7 @@ from ..Tools.operator import operator
 import copy
 
 
-class mixed_eigenvalue_one_group(pdeBase):
+class mixed_one_group_diffusion_eigenvalue(pdeBase):
     def __init__(self,domain,model,params_pde,params_solver,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde
@@ -79,7 +79,6 @@ class mixed_eigenvalue_one_group(pdeBase):
         # innerSolver = torch.linalg.vector_norm(eq)/torch.linalg.vector_norm(bs)
         
         self.it = self.it + 1
-
         if self.do_outer == False :
             # stop algorithm 
             self.stopping = True

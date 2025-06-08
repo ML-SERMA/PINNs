@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_two_group import mixed_diffusion_two_group
+from pyPINNs.PDE.mixed_two_group_diffusion_source import mixed_two_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -184,7 +184,7 @@ print('model',model_fcn)
 
 
 # Training Time
-mypde = mixed_diffusion_two_group(pdeDomain,model_fcn,params_pde,device)
+mypde = mixed_two_group_diffusion_source(pdeDomain,model_fcn,params_pde,device)
 
 # parameters = [*mypde.model.parameters(), *mypde.loss_function.parameters()]
 # optimizer = torch.optim.Adam(parameters, lr=1.e-3,weight_decay=0.0)

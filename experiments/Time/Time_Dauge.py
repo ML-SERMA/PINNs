@@ -12,12 +12,12 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_one_group import mixed_diffusion_one_group
-from pyPINNs.PDE.primal_diffusion_one_group import primal_diffusion_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
+from pyPINNs.PDE.primal_one_group_diffusion_source import primal_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
-from pyPINNs.Tools.utils import get_time
+from pyPINNs.Tools.utils import get_time, get_time_gpu
 from pyPINNs.Model.neuron_network.FCN import FCN_FF
 from pyPINNs.Data.DataSet import DataSet
 from pyPINNs.Train.train_model import train
@@ -55,10 +55,12 @@ print(f"Running on {device}. Yes! ")
 
 
 
-params_domain = {'xmin':[0, 0], 'xmax':[1, 1]}
-params_data = [{'n_collocation':10*1024,'n_boundary':args.n_boundary,'n_test':args.n_test,'random_seed':2024,'device':device},
-               {'n_collocation':40*1024,'n_boundary':args.n_boundary,'n_test':args.n_test,'random_seed':2024,'device':device},
-               {'n_collocation':80*1024,'n_boundary':args.n_boundary,'n_test':args.n_test,'random_seed':2024,'device':device},
+# params_domain = {'xmin':[0, 0], 'xmax':[1, 1],'boundary_conditions':[['ZERO_FLUX', 'ZERO_FLUX'],['ZERO_FLUX', 'ZERO_FLUX']]}
+params_domain = {'xmin':[0, 0], 'xmax':[1, 1],'boundary_conditions': [['VACUUM', 'VACUUM'],['VACUUM', 'VACUUM']]}
+
+params_data = [{'n_collocation':10*1024,'n_boundary':512,'n_test':args.n_test,'random_seed':2024,'device':device},
+               {'n_collocation':40*1024,'n_boundary':10*512,'n_test':args.n_test,'random_seed':2024,'device':device},
+               {'n_collocation':80*1024,'n_boundary':20*512,'n_test':args.n_test,'random_seed':2024,'device':device},
                  ]
 params_model_mixed = [{'layers': [2]+3*[64]+[3],'activation':args.activation,'device':device,'fourier_mapping_size':None,'hard_BC':None},
                       {'layers': [2]+5*[64]+[3],'activation':args.activation,'device':device,'fourier_mapping_size':None,'hard_BC':None},
@@ -98,8 +100,8 @@ pdeData = [DataSet(domain=pdeDomain,**params_data[id]) for id in range(len(param
 model_fcn_mixed  = [FCN_FF(**params_model_mixed[id]).to(device) for id in range(len(params_model_mixed))]
 model_fcn_primal = [FCN_FF(**params_model_primal[id]).to(device) for id in range(len(params_model_primal))]
 
-pde_mixed  = [mixed_diffusion_one_group(pdeDomain,model_fcn_mixed[id],params_pde,device) for id in range(len(model_fcn_mixed))]
-pde_primal = [primal_diffusion_one_group(pdeDomain,model_fcn_primal[id],params_pde,device) for id in range(len(model_fcn_primal))]
+pde_mixed  = [mixed_one_group_diffusion_source(pdeDomain,model_fcn_mixed[id],params_pde,device) for id in range(len(model_fcn_mixed))]
+pde_primal = [primal_one_group_diffusion_source(pdeDomain,model_fcn_primal[id],params_pde,device) for id in range(len(model_fcn_primal))]
 
 # optimizer_mixed = [torch.optim.Adam(pde_mixed[id].model.parameters(), lr=1.e-3,weight_decay=0.0) for id in range(2)]
 # scheduler_mixed = [torch.optim.lr_scheduler.StepLR(optimizer_mixed[id], step_size=2000, gamma=0.95) for id in range(2)]
@@ -126,8 +128,8 @@ for id in range(len(pdeData)):
     for im in range(len(pde_mixed)):
         # print(f'id= {id}, im = {im}')
         
-        time_PDE_primal, time_BC_primal = get_time(pde_primal[im],pdeData[id],n_step=1000,k=2)
-        time_PDE_mixed, time_BC_mixed = get_time(pde_mixed[im],pdeData[id],n_step=1000,k=2)
+        time_PDE_primal, time_BC_primal = get_time_gpu(pde_primal[im],pdeData[id],n_step=1000,k=2)
+        time_PDE_mixed, time_BC_mixed = get_time_gpu(pde_mixed[im],pdeData[id],n_step=1000,k=2)
         list_PDE_primal.append(time_PDE_primal)
         list_BC_primal.append(time_BC_primal)
         list_PDE_mixed.append(time_PDE_mixed)
@@ -147,11 +149,14 @@ for id in range(len(pdeData)):
     my_PDE_mixed.append(arr_PDE_mixed)
     my_BC_mixed.append(arr_BC_mixed)
 PDE_primal = np.vstack(my_PDE_primal)
-print(f"==>> PDE_primal: {PDE_primal}")
 BC_primal  =np.vstack(my_BC_primal)
 PDE_mixed = np.vstack(my_PDE_mixed)
-print(f"==>> PDE_mixed: {PDE_mixed}")
 BC_mixed   = np.vstack(my_BC_mixed)
+print(f"==>> PDE_primal: {PDE_primal}")
+print(f"==>> PDE_mixed: {PDE_mixed}")
+
+print(f"==>> BC_primal: {BC_primal}")
+print(f"==>> BC_mixed: {BC_mixed}")
 
 
 

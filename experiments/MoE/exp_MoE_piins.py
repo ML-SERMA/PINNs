@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_diffusion_one_group import mixed_diffusion_one_group
+from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
 
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
@@ -128,7 +128,7 @@ print(f"==>>  params: {params}")
 
 
 
-mypde = mixed_diffusion_one_group(pdeDomain,model_moe,params_pde,device)
+mypde = mixed_one_group_diffusion_source(pdeDomain,model_moe,params_pde,device)
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.95)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)

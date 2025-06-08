@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from ..Tools.operator import operator
 import copy
 
-class direct_mixed_eigenvalue_one_group(pdeBase):
+class direct_mixed_one_group_diffusion_eigenvalue(pdeBase):
     def __init__(self,domain,model,params_pde,params_solver,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde

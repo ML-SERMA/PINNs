@@ -4,7 +4,7 @@ from .pdeBase import pdeBase
 import matplotlib.pyplot as plt
 from ..Tools.operator import operator
 import time
-class primal_diffusion_one_group(pdeBase):
+class primal_one_group_diffusion_source(pdeBase):
     def __init__(self,domain,model,params_pde,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde
@@ -33,24 +33,26 @@ class primal_diffusion_one_group(pdeBase):
                     phi = self.model.forward(X_bc[idim][id])[:,0:1]
                     g_D = torch.zeros_like(phi)
                     residu = phi-g_D
-                # elif self.domain.boundary_conditions[idim][id] == 'REFLECTION':
-                #     p = self.model.forward(X_bc[idim][id])[:,1:]
-                #     n = (-1)**(id+1) # square domain
-                #     pn = p[:,idim:idim+1]*n
-                #     g_N = torch.zeros_like(pn)
-                #     residu = pn-g_N
-                # elif self.domain.boundary_conditions[idim][id] == 'VACUUM':
-                #     zeta = self.model.forward(X_bc[idim][id])
-                #     phi = zeta[:,0:1]
-                #     p   = zeta[:,1:]
-                #     # phi = self.model.forward(X_bc[idim][id])[:,0:1]
-                #     # p = self.model.forward(X_bc[idim][id])[:,1:]
-                #     n = (-1)**(id+1)
-                #     pn = p[:,idim:idim+1]*n
-                #     g_R = torch.zeros_like(phi)
-                #     residu = -pn+ 0.5*phi-g_R
+                elif self.domain.boundary_conditions[idim][id] == 'REFLECTION':
+                    phi = self.model.forward(X_bc[idim][id])[:,0:1]
+                    D = self.params_pde['func_D'](X_bc[idim][id]).to(self.device)
+                    p = -D*operator.grad(phi,X_bc[idim][id])
+                    
+                    n = (-1)**(id+1) # square domain
+                    pn = p[:,idim:idim+1]*n
+                    g_N = torch.zeros_like(pn)
+                    residu = pn-g_N
+                elif self.domain.boundary_conditions[idim][id] == 'VACUUM':
+                    phi = self.model.forward(X_bc[idim][id])[:,0:1]
+                    D = self.params_pde['func_D'](X_bc[idim][id]).to(self.device)
+                    p = -D*operator.grad(phi,X_bc[idim][id])
+                    
+                    n = (-1)**(id+1)
+                    pn = p[:,idim:idim+1]*n
+                    g_R = torch.zeros_like(phi)
+                    residu = -pn+ 0.5*phi-g_R
                 else:
-                    # print('Check again boundary condition')
+                    print('Check again boundary condition')
                     residu = torch.zeros_like(X_bc[idim][id])[:,0:1]
                 list_residu_BC.append(residu)
         residu_BC = torch.vstack(list_residu_BC)

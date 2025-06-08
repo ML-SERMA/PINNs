@@ -4,7 +4,7 @@ from .pdeBase import pdeBase
 import matplotlib.pyplot as plt
 from ..Tools.operator import operator
 
-class DDM_mixed_diffusion_one_group(pdeBase):
+class DDM_mixed_one_group_diffusion_source(pdeBase):
     def __init__(self,domain,model,params_pde,device):
         super().__init__(domain,model,device)
         self.params_pde = params_pde
@@ -86,13 +86,11 @@ class DDM_mixed_diffusion_one_group(pdeBase):
                         residu[:,0:1] = phi-g_D
                         residu[:,idim+1:idim+2] = pn -g_N
                         # residu[:,idim+1:idim+2] = pn +2*phi-g_N
-
-                    
+      
                 else:
                     # print('Check again boundary condition')
                     residu = torch.zeros_like(X_bc[idim][id])
-                # print(f"==>> residu : {residu}")
-                # input('Enter')
+
                 list_residu_BC.append(residu)
         residu_BC = torch.vstack(list_residu_BC)
         return residu_BC
