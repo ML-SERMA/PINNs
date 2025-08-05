@@ -5,9 +5,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
 import pandas as pd
 import matplotlib.colors as colors
+# import pyvista as pv
 import pyvista as pv
 import torch
-
+import os
 class visualization:
     @staticmethod
     def viewGrid(mesh):
@@ -41,174 +42,279 @@ class visualization:
         ax.pcolormesh(mesh.xpos[0], mesh.xpos[1], Z, shading='flat', vmin=minFlux, vmax=maxFlux,cmap='jet')
         # plt.show(block=False)
         plt.show()
-        
-        
     @staticmethod
-    def viewCrossSection(X,S,pathFile=None):
-        x=X[:,0:1]
-        y=X[:,1:2]
-        if S is None:
-            fig, ax = plt.subplots()
-            sc = ax.scatter(x=x.cpu().detach().numpy(), y=y.cpu().detach().numpy(), alpha=0.5,cmap='rainbow')
-            ax.grid(True)
-            plt.colorbar(sc)
-            if pathFile is not None:
-                plt.savefig(pathFile)
+    def viewCrossSection(X, S=None, pathFile=None, title=None, cmap='rainbow', alpha=0.6, s=20, show=True):
+        """
+        Visualize cross-section (2D or 3D) or spatial point distribution.
+
+        Parameters:
+            X (Tensor): Coordinates [N, 2] or [N, 3] (x, y [, z]).
+            S (Tensor or None): Values to color-code points. If None, no color.
+            pathFile (str or None): If provided, saves figure to this path.
+            title (str or None): Title of the plot.
+            cmap (str): Colormap.
+            alpha (float): Transparency of scatter points.
+            s (int): Size of points.
+            show (bool): Whether to show the plot (useful for batch saving).
+        """
+        X = X.detach().cpu()
+        dim = X.shape[1]
+        assert dim in (2, 3), f"Expected 2D or 3D coordinates, got {dim}D"
+
+        if S is not None:
+            S = S.detach().cpu()
+
+        fig = plt.figure()
+        
+        if dim == 2:
+            ax = fig.add_subplot(111)
+            sc = ax.scatter(X[:, 0], X[:, 1], c=S if S is not None else 'gray',
+                            cmap=cmap if S is not None else None,
+                            alpha=alpha, s=s)
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
         else:
-            fig, ax = plt.subplots()
-            sc = ax.scatter(x=x.cpu().detach().numpy(), y=y.cpu().detach().numpy(), c=S.cpu().detach().numpy(), alpha=0.5,cmap='rainbow')
-            ax.grid(True)
-            plt.colorbar(sc)
-            if pathFile is not None:
-                plt.savefig(pathFile)
+            ax = fig.add_subplot(111, projection='3d')
+            sc = ax.scatter(X[:, 0], X[:, 1], X[:, 2], c=S if S is not None else 'gray',
+                            cmap=cmap if S is not None else None,
+                            alpha=alpha, s=s)
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.set_zlabel("z")
+
+        if S is not None:
+            plt.colorbar(sc, ax=ax, label='Value')
+
+        if title:
+            ax.set_title(title)
+
+        ax.grid(True)
+
+        if pathFile:
+            plt.savefig(pathFile, bbox_inches='tight')
+
+        if show:
+            plt.show()
+
+        plt.close(fig)   
+        
+    # @staticmethod
+    # def viewCrossSection(X,S,pathFile=None):
+        
+    #     x=X[:,0:1]
+    #     y=X[:,1:2]
+    #     if S is None:
+    #         fig, ax = plt.subplots()
+    #         sc = ax.scatter(x=x.cpu().detach().numpy(), y=y.cpu().detach().numpy(), alpha=0.5,cmap='rainbow')
+    #         ax.grid(True)
+    #         plt.colorbar(sc)
+    #         if pathFile is not None:
+    #             plt.savefig(pathFile)
+    #     else:
+    #         fig, ax = plt.subplots()
+    #         sc = ax.scatter(x=x.cpu().detach().numpy(), y=y.cpu().detach().numpy(), c=S.cpu().detach().numpy(), alpha=0.5,cmap='rainbow')
+    #         ax.grid(True)
+    #         plt.colorbar(sc)
+    #         if pathFile is not None:
+    #             plt.savefig(pathFile)
     
-    @staticmethod
-    def viewErrorAndSolutionScale(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.pdf',vminE=None,vmaxE=None,vminF=None,vmaxF=None):
-        x_bound_low = params_domain['xmin'][0]
-        x_bound_up  = params_domain['xmax'][0]
-        y_bound_low = params_domain['xmin'][1]
-        y_bound_up  = params_domain['xmax'][1]
-        num_test_x = n_test[0]
-        num_test_y = n_test[1]
-        normE = colors.LogNorm(vmin=max(vminE,1.e-9), vmax=vmaxE)
-        # normF = colors.LogNorm(vmin=vminF, vmax=vmaxF)
+    # @staticmethod
+    # def viewErrorAndSolutionScale(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.pdf',vminE=None,vmaxE=None,vminF=None,vmaxF=None):
+    #     x_bound_low = params_domain['xmin'][0]
+    #     x_bound_up  = params_domain['xmax'][0]
+    #     y_bound_low = params_domain['xmin'][1]
+    #     y_bound_up  = params_domain['xmax'][1]
+    #     num_test_x = n_test[0]
+    #     num_test_y = n_test[1]
+    #     normE = colors.LogNorm(vmin=max(vminE,1.e-9), vmax=vmaxE)
+    #     # normF = colors.LogNorm(vmin=vminF, vmax=vmaxF)
         
-        fig = plt.figure()
-        fig.set_figheight(5)
-        fig.set_figwidth(19)
+    #     fig = plt.figure()
+    #     fig.set_figheight(5)
+    #     fig.set_figwidth(19)
 
-        # Plot the Error
-        ax1 = plt.subplot(1, 3, 1)
-        shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth',norm=normE, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw1)
-        plt.xlabel(r'$x_1$')
-        plt.ylabel(r'$x_2$')
-        # plt.colorbar(shw1,ax=ax1)
-        ax1.set_title("Absolute Error")
-
-
-        # Plot the Predicted values for the NN
-        ax2 = plt.subplot(1, 3, 2)
-        shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw2)
-        plt.xlabel(r'$x_1$')
-        plt.ylabel(r'$x_2$')
-        ax2.set_title("Predicted Solution")
+    #     # Plot the Error
+    #     ax1 = plt.subplot(1, 3, 1)
+    #     shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth',norm=normE, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #     plt.colorbar(shw1)
+    #     plt.xlabel(r'$x_1$')
+    #     plt.ylabel(r'$x_2$')
+    #     # plt.colorbar(shw1,ax=ax1)
+    #     ax1.set_title("Absolute Error")
 
 
-        # Plot the exact solution
-        ax3 = plt.subplot(1, 3, 3)
-        shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw3)
-        plt.xlabel(r'$x_1$')
-        plt.ylabel(r'$x_2$') 
-        ax3.set_title("Reference Solution")
-        plt.tight_layout()
-        plt.savefig(save_dir+name)
+    #     # Plot the Predicted values for the NN
+    #     ax2 = plt.subplot(1, 3, 2)
+    #     shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #     plt.colorbar(shw2)
+    #     plt.xlabel(r'$x_1$')
+    #     plt.ylabel(r'$x_2$')
+    #     ax2.set_title("Predicted Solution")
 
-        isSeparateFigure = True
 
-        if isSeparateFigure:
-            fig, ax = plt.subplots()
-            shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth',norm=normE, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-            plt.colorbar(shw1)
-            plt.xlabel(r'$x_1$')
-            plt.ylabel(r'$x_2$')
-            plt.tight_layout()
-            # ax.set_title("Absolute Error")
-            plt.savefig(save_dir+'AE_'+name)
-            #=============================================================================================
-            fig, ax = plt.subplots()
-            shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-            plt.colorbar(shw2)
-            plt.xlabel(r'$x_1$')
-            plt.ylabel(r'$x_2$')
-            plt.tight_layout() 
-            # ax.set_title("Predicted Solution")
-            plt.savefig(save_dir+'Predicted_'+name)
+    #     # Plot the exact solution
+    #     ax3 = plt.subplot(1, 3, 3)
+    #     shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #     plt.colorbar(shw3)
+    #     plt.xlabel(r'$x_1$')
+    #     plt.ylabel(r'$x_2$') 
+    #     ax3.set_title("Reference Solution")
+    #     plt.tight_layout()
+    #     plt.savefig(save_dir+name)
 
-            fig, ax = plt.subplots()
-            shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-            plt.colorbar(shw3)
-            plt.xlabel(r'$x_1$')
-            plt.ylabel(r'$x_2$')
-            plt.tight_layout()
-            # ax.set_title("Reference Solution")
-            plt.savefig(save_dir+'Reference_'+name)
+    #     isSeparateFigure = True
+
+    #     if isSeparateFigure:
+    #         fig, ax = plt.subplots()
+    #         shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth',norm=normE, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw1)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         plt.tight_layout()
+    #         # ax.set_title("Absolute Error")
+    #         plt.savefig(save_dir+'AE_'+name)
+    #         #=============================================================================================
+    #         fig, ax = plt.subplots()
+    #         shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw2)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         plt.tight_layout() 
+    #         # ax.set_title("Predicted Solution")
+    #         plt.savefig(save_dir+'Predicted_'+name)
+
+    #         fig, ax = plt.subplots()
+    #         shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow',vmin=vminF,vmax=vmaxF, interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw3)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         plt.tight_layout()
+    #         # ax.set_title("Reference Solution")
+    #         plt.savefig(save_dir+'Reference_'+name)
             
-    @staticmethod
-    def viewErrorAndSolution(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.pdf'):
-        x_bound_low = params_domain['xmin'][0]
-        x_bound_up  = params_domain['xmax'][0]
-        y_bound_low = params_domain['xmin'][1]
-        y_bound_up  = params_domain['xmax'][1]
-        num_test_x = n_test[0]
-        num_test_y = n_test[1]
-        
-        fig = plt.figure()
-        fig.set_figheight(5)
-        fig.set_figwidth(19)
+    # @staticmethod
+    # def viewErrorAndSolution(params_domain,n_test,error,u_pred,u_test,save_dir,name='error_test.pdf'):
+    #     ndim = len(params_domain['xmin'])
+    #     if ndim ==2 :
+    #         x_bound_low = params_domain['xmin'][0]
+    #         x_bound_up  = params_domain['xmax'][0]
+    #         y_bound_low = params_domain['xmin'][1]
+    #         y_bound_up  = params_domain['xmax'][1]
+    #         num_test_x = n_test[0]
+    #         num_test_y = n_test[1]
+            
+    #         fig = plt.figure()
+    #         fig.set_figheight(5)
+    #         fig.set_figwidth(19)
 
-        # Plot the Error
-        ax1 = plt.subplot(1, 3, 1)
-        shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw1)
-        plt.xlabel(r'$x_1$')
-        plt.ylabel(r'$x_2$')
-        # plt.colorbar(shw1,ax=ax1)
-        ax1.set_title("Absolute Error")
-
-
-        # Plot the Predicted values for the NN
-        ax2 = plt.subplot(1, 3, 2)
-        shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw2)
-        plt.xlabel(r'$x_1$')
-        plt.ylabel(r'$x_2$')
-        ax2.set_title("Predicted Solution")
+    #         # Plot the Error
+    #         ax1 = plt.subplot(1, 3, 1)
+    #         shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw1)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         # plt.colorbar(shw1,ax=ax1)
+    #         ax1.set_title("Absolute Error")
 
 
-        # Plot the exact solution
-        ax3 = plt.subplot(1, 3, 3)
-        shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw3)
-        plt.xlabel(r'$x_1$')
-        plt.ylabel(r'$x_2$')
-        ax3.set_title("Reference Solution")
-        plt.tight_layout()
-        plt.savefig(save_dir+name)
-
-        isSeparateFigure = True
-
-        if isSeparateFigure:
-            fig, ax = plt.subplots()
-            shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-            plt.colorbar(shw1)
-            plt.xlabel(r'$x_1$')
-            plt.ylabel(r'$x_2$')
-            plt.tight_layout()
-            # ax.set_title("Absolute Error")
-            plt.savefig(save_dir+'AE_'+name)
-            #=============================================================================================
-            fig, ax = plt.subplots()
-            shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-            plt.colorbar(shw2)
-            plt.xlabel(r'$x_1$')
-            plt.ylabel(r'$x_2$')
-            plt.tight_layout() 
-            # ax.set_title("Predicted Solution")
-            plt.savefig(save_dir+'Predicted_'+name)
-
-            fig, ax = plt.subplots()
-            shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-            plt.colorbar(shw3)
-            plt.xlabel(r'$x_1$')
-            plt.ylabel(r'$x_2$')
-            plt.tight_layout()
-            # ax.set_title("Reference Solution")
-            plt.savefig(save_dir+'Reference_'+name)
+    #         # Plot the Predicted values for the NN
+    #         ax2 = plt.subplot(1, 3, 2)
+    #         shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw2)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         ax2.set_title("Predicted Solution")
 
 
+    #         # Plot the exact solution
+    #         ax3 = plt.subplot(1, 3, 3)
+    #         shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw3)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         ax3.set_title("Reference Solution")
+    #         plt.tight_layout()
+    #         plt.savefig(save_dir+name)
+
+    #         isSeparateFigure = False
+    #         if isSeparateFigure:
+    #             fig, ax = plt.subplots()
+    #             shw1 = plt.imshow(error.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #             plt.colorbar(shw1)
+    #             plt.xlabel(r'$x_1$')
+    #             plt.ylabel(r'$x_2$')
+    #             plt.tight_layout()
+    #             # ax.set_title("Absolute Error")
+    #             plt.savefig(save_dir+'AE_'+name)
+    #             #=============================================================================================
+    #             fig, ax = plt.subplots()
+    #             shw2 = plt.imshow(u_pred.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #             plt.colorbar(shw2)
+    #             plt.xlabel(r'$x_1$')
+    #             plt.ylabel(r'$x_2$')
+    #             plt.tight_layout() 
+    #             # ax.set_title("Predicted Solution")
+    #             plt.savefig(save_dir+'Predicted_'+name)
+
+    #             fig, ax = plt.subplots()
+    #             shw3 = plt.imshow(u_test.cpu().detach().numpy().reshape((num_test_y, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #             plt.colorbar(shw3)
+    #             plt.xlabel(r'$x_1$')
+    #             plt.ylabel(r'$x_2$')
+    #             plt.tight_layout()
+    #             # ax.set_title("Reference Solution")
+    #             plt.savefig(save_dir+'Reference_'+name)
+
+    #     elif ndim ==3 :
+    #         x_bound_low = params_domain['xmin'][0]
+    #         x_bound_up  = params_domain['xmax'][0]
+    #         y_bound_low = params_domain['xmin'][1]
+    #         y_bound_up  = params_domain['xmax'][1]
+    #         num_test_x = n_test[0]
+    #         num_test_y = n_test[1]
+    #         num_test_z = n_test[2]
+
+    #         M_error = error.cpu().detach().numpy().reshape((num_test_x, num_test_y,num_test_z), order="F")
+    #         M_pred = u_pred.cpu().detach().numpy().reshape((num_test_x, num_test_y,num_test_z), order="F")
+    #         M_test = u_test.cpu().detach().numpy().reshape((num_test_x, num_test_y,num_test_z), order="F")
+
+    #         index_z = n_test[2]//2
+    #         M_error_slice = M_error[:,:,index_z]
+    #         M_pred_slice  = M_pred[:,:,index_z]
+    #         M_test_slice  = M_test[:,:,index_z]
+            
+    #         fig = plt.figure()
+    #         fig.set_figheight(5)
+    #         fig.set_figwidth(19)
+
+    #         # Plot the Error
+    #         ax1 = plt.subplot(1, 3, 1)
+    #         shw1 = plt.imshow(M_error_slice.T, cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw1)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         # plt.colorbar(shw1,ax=ax1)
+    #         ax1.set_title("Absolute Error")
+
+    #         # Plot the Predicted values for the NN
+    #         ax2 = plt.subplot(1, 3, 2)
+    #         shw2 = plt.imshow(M_pred_slice.T, cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw2)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         ax2.set_title("Predicted Solution")
+
+    #         # Plot the exact solution
+    #         ax3 = plt.subplot(1, 3, 3)
+    #         shw3 = plt.imshow(M_test_slice.T, cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
+    #         plt.colorbar(shw3)
+    #         plt.xlabel(r'$x_1$')
+    #         plt.ylabel(r'$x_2$')
+    #         ax3.set_title("Reference Solution")
+    #         plt.tight_layout()
+    #         plt.savefig(save_dir+name)
+    #     else:
+    #         print('Pass')
 
     @staticmethod
     def show_loss(pathFile,save_dir,Error_phi=False,Error_p=False):
@@ -334,66 +440,397 @@ class visualization:
         plt.show(block=False)
         
         
+    # @staticmethod
+    # def viewErrorAndCurrents(mesh,p_error,p_pred,p_test,save_dir,name='error_currents_test.png'):
+    #     ndim = mesh.ndim
+    #     if ndim ==2 :
+            
+    #         xmid, ymid = mesh.xmid
+    #         xpos, ypos = mesh.xpos
+    #         nx, ny = len(xmid), len(ymid)
+    #         bounds = (mesh.xmin[0],mesh.xmax[0], mesh.xmin[1], mesh.xmax[1]) # on 2D
+            
+    #         sizes = [(ny, nx+1),  (ny+1, nx)]
+    #         P_error = [p_error[id].cpu().detach().numpy().reshape(sizes[id], order="C") for id in range(ndim)]
+    #         P_pred =  [p_pred[id].cpu().detach().numpy().reshape(sizes[id], order="C") for id in range(ndim)]
+    #         P_test =  [p_test[id].cpu().detach().numpy().reshape(sizes[id], order="C") for id in range(ndim)]
+
+    #         fig = plt.figure()
+    #         fig.set_figheight(10)
+    #         fig.set_figwidth(20)
+
+    #         for id in range(ndim):
+    #             # Plot the Error
+    #             ax1 = plt.subplot(2, 3, 3*id +1)
+    #             shw1 = plt.imshow(P_error[id], cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=bounds)
+    #             plt.colorbar(shw1)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax1.set_title("Absolute Error")
+    #             # Plot the Predicted values for the NN
+    #             ax2 = plt.subplot(2, 3, 3*id+2)
+    #             shw2 = plt.imshow(P_pred[id], cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=bounds)
+    #             plt.colorbar(shw2)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')    
+    #             ax2.set_title("Predicted Solution")
+    #             # Plot the exact solution
+    #             ax3 = plt.subplot(2, 3, 3*id+3)
+    #             shw3 = plt.imshow(P_test[id], cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=bounds)
+    #             plt.colorbar(shw3)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')  
+    #             ax3.set_title("Reference Solution")
+    #         plt.savefig(save_dir+name)
+
+    #     elif ndim==3:
+            
+    #         xmid, ymid, zmid = mesh.xmid
+    #         xpos, ypos, zpos = mesh.xpos
+    #         nx, ny, nz = len(xmid), len(ymid), len(zmid)
+    #         bounds = (mesh.xmin[0],mesh.xmax[0], mesh.xmin[1], mesh.xmax[1]) # on 2D
+            
+            
+    #         ##=====================================
+    #         sizes = [(nx + 1, ny, nz),  (nx, ny + 1, nz), (nx, ny, nz + 1)]
+    #         P_error = [p_error[id].cpu().detach().numpy().reshape(sizes[id], order="F") for id in range(ndim)]
+    #         P_pred =  [p_pred[id].cpu().detach().numpy().reshape(sizes[id], order="F") for id in range(ndim)]
+    #         P_test =  [p_test[id].cpu().detach().numpy().reshape(sizes[id], order="F") for id in range(ndim)]
+    #         index_z = nz//2
+
+    #         fig = plt.figure()
+    #         fig.set_figheight(10)
+    #         fig.set_figwidth(20)
+    #         for id in range(ndim):
+    #             ax1 = plt.subplot(3, 3, 3*id+1)
+    #             shw1 = plt.imshow(P_error[id][:,:,index_z].T, cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=bounds)
+    #             plt.colorbar(shw1)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax1.set_title("Absolute Error")
+    #             # Plot the Predicted values for the NN
+    #             ax2 = plt.subplot(3, 3, 3*id+2)
+    #             shw2 = plt.imshow(P_pred[id][:,:,index_z].T, cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=bounds)
+    #             plt.colorbar(shw2)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')    
+    #             ax2.set_title("Predicted Solution")
+    #             # Plot the exact solution
+    #             ax3 = plt.subplot(3, 3, 3*id+3)
+    #             shw3 = plt.imshow(P_test[id][:,:,index_z].T, cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=bounds)
+    #             plt.colorbar(shw3)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')  
+    #             ax3.set_title("Reference Solution")
+    #         plt.savefig(save_dir+name)
+
+
     @staticmethod
-    def viewErrorAndCurrents(params_domain,n_test,p_error,p_pred,p_test,save_dir,name='error_currents_test.png'):
-        x_bound_low = params_domain['xmin'][0]
-        x_bound_up  = params_domain['xmax'][0]
-        y_bound_low = params_domain['xmin'][1]
-        y_bound_up  = params_domain['xmax'][1]
-        num_test_x = n_test[0]
-        num_test_y = n_test[1]
+    def viewFlux(mesh, phi_pred, save_dir, name='flux_pred.png', order='C'):
+        """
+        Visualizes the scalar flux (phi_pred) for both 2D and 3D cases.
+        
+        Parameters:
+        -----------
+        mesh : object
+            Mesh object with attributes: ndim, xmid, xmin, xmax
+        phi_pred : torch.Tensor
+            Predicted flux values, shape (N, 1) where N = nx*ny (2D) or nx*ny*nz (3D)
+        save_dir : str
+            Directory to save the plot
+        name : str
+            File name to save the figure
+        order : str
+            'C' or 'F' order used when reshaping for visualization
+        """
+        ndim = mesh.ndim
+        os.makedirs(save_dir, exist_ok=True)
+
+        if ndim == 2:
+            centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+            xmid, ymid = centers
+            xmin = mesh.xmin.detach().cpu().numpy()
+            xmax = mesh.xmax.detach().cpu().numpy()
+            nx, ny = xmid.shape[0], ymid.shape[0]
+            bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+            
+            
+            phi = phi_pred.cpu().detach().numpy().reshape((ny, nx), order=order)
+            # No transpose is needed here, even for Fortran order
+
+            plt.figure(figsize=(8, 6))
+            im = plt.imshow(phi, cmap='rainbow', interpolation="none", origin='lower', aspect='auto', extent=bounds)
+            plt.colorbar(im)
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.title('Predicted Scalar Flux')
+            plt.tight_layout()
+            plt.savefig(os.path.join(save_dir, name))
+            plt.close()
+
+        elif ndim == 3:
+            centers = [center.detach().cpu().numpy() for center in mesh.centers]
+            xmid, ymid, zmid = centers
+            xmin = mesh.xmin.detach().cpu().numpy()
+            xmax = mesh.xmax.detach().cpu().numpy()
+            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+            bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
 
 
-        
-        fig = plt.figure()
-        fig.set_figheight(10)
-        fig.set_figwidth(20)
+            phi = phi_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+            index_z = nz // 2
+            phi_slice = phi[:, :, index_z].T  # Transpose to align with (X, Y) for imshow
 
-        # Plot the Error
-        ax1 = plt.subplot(2, 3, 1)
-        shw1 = plt.imshow(p_error[0].cpu().detach().numpy().reshape((num_test_y, num_test_x+1)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw1)
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        ax1.set_title("Absolute Error")
-        # Plot the Predicted values for the NN
-        ax2 = plt.subplot(2, 3, 2)
-        shw2 = plt.imshow(p_pred[0].cpu().detach().numpy().reshape((num_test_y, num_test_x+1)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw2)
-        plt.xlabel('X')
-        plt.ylabel('Y')    
-        ax2.set_title("Predicted Solution")
-        # Plot the exact solution
-        ax3 = plt.subplot(2, 3, 3)
-        shw3 = plt.imshow(p_test[0].cpu().detach().numpy().reshape((num_test_y, num_test_x+1)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw3)
-        plt.xlabel('X')
-        plt.ylabel('Y')  
-        ax3.set_title("Reference Solution")
-        #=================================================
-        ax4 = plt.subplot(2, 3, 4)
-        shw4 = plt.imshow(p_error[1].cpu().detach().numpy().reshape((num_test_y+1, num_test_x)), cmap='gist_earth', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw4)
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        ax4.set_title("Absolute Error")
-        # Plot the Predicted values for the NN
-        ax5 = plt.subplot(2, 3, 5)
-        shw5 = plt.imshow(p_pred[1].cpu().detach().numpy().reshape((num_test_y+1, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw5)
-        plt.xlabel('X')
-        plt.ylabel('Y')    
-        ax5.set_title("Predicted Solution")
-        # Plot the exact solution
-        
-        ax6 = plt.subplot(2, 3, 6)
-        shw6 = plt.imshow(p_test[1].cpu().detach().numpy().reshape((num_test_y+1, num_test_x)), cmap='rainbow', interpolation="none", aspect='auto', origin='lower', extent=(x_bound_low, x_bound_up, y_bound_low, y_bound_up))
-        plt.colorbar(shw6)
-        plt.xlabel('X')
-        plt.ylabel('Y')  
-        ax6.set_title("Reference Solution")
-        plt.savefig(save_dir+name)
-        
+            plt.figure(figsize=(8, 6))
+            im = plt.imshow(phi_slice, cmap='rainbow', interpolation="none", origin='lower', aspect='auto', extent=bounds)
+            plt.colorbar(im)
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.title(f'Predicted Scalar Flux (Z-slice {index_z})')
+            plt.tight_layout()
+            plt.savefig(os.path.join(save_dir, name))
+            plt.close()
+
+        else:
+            raise ValueError("Only 2D and 3D are supported.")
+
+    @staticmethod
+    def viewErrorAndFlux(mesh, flux_error, flux_pred, flux_test, save_dir, name='flux_test.png', order='C'):
+        """
+        Visualize error, predicted, and reference scalar flux for 2D and 3D meshes.
+
+        Parameters:
+        - mesh: object with attributes ndim, xmin, xmax, xmid
+        - flux_error, flux_pred, flux_test: torch tensors of shape (N,) or (num_nodes,)
+        - save_dir: directory to save the figure
+        - name: filename for the figure
+        - order: 'C' or 'F' for numpy reshape order
+        """
+
+        ndim = mesh.ndim
+
+        if ndim == 2:
+            centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+            xmid, ymid = centers
+            xmin = mesh.xmin.detach().cpu().numpy()
+            xmax = mesh.xmax.detach().cpu().numpy()
+            nx, ny = xmid.shape[0], ymid.shape[0]
+            bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+            # Reshape arrays (assume nodal data size = nx * ny)
+            error_np = flux_error.cpu().detach().numpy().reshape((ny, nx), order=order)
+            pred_np = flux_pred.cpu().detach().numpy().reshape((ny, nx), order=order)
+            test_np = flux_test.cpu().detach().numpy().reshape((ny, nx), order=order)
+
+            # Transpose if Fortran order
+            if order == 'F':
+                error_np = error_np.T
+                pred_np = pred_np.T
+                test_np = test_np.T
+
+            fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+            im0 = axs[0].imshow(error_np, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
+            axs[0].set_title('Absolute Error')
+            axs[0].set_xlabel('X')
+            axs[0].set_ylabel('Y')
+            plt.colorbar(im0, ax=axs[0])
+
+            im1 = axs[1].imshow(pred_np, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+            axs[1].set_title('Predicted Flux')
+            axs[1].set_xlabel('X')
+            axs[1].set_ylabel('Y')
+            plt.colorbar(im1, ax=axs[1])
+
+            im2 = axs[2].imshow(test_np, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+            axs[2].set_title('Reference Flux')
+            axs[2].set_xlabel('X')
+            axs[2].set_ylabel('Y')
+            plt.colorbar(im2, ax=axs[2])
+
+            plt.tight_layout()
+            plt.savefig(save_dir + name)
+            plt.close()
+
+        elif ndim == 3:
+            
+            centers = [center.detach().cpu().numpy() for center in mesh.centers]
+            xmid, ymid, zmid = centers
+            xmin = mesh.xmin.detach().cpu().numpy()
+            xmax = mesh.xmax.detach().cpu().numpy()
+            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+            bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+            # Reshape nodal data
+            error_np = flux_error.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+            pred_np = flux_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+            test_np = flux_test.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+
+            index_z = nz // 2  # middle slice along z
+
+            slice_error = error_np[:, :, index_z]
+            slice_pred = pred_np[:, :, index_z]
+            slice_test = test_np[:, :, index_z]
+
+            # Transpose for Fortran order
+            if order == 'F':
+                slice_error = slice_error.T
+                slice_pred = slice_pred.T
+                slice_test = slice_test.T
+
+            fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+            im0 = axs[0].imshow(slice_error, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
+            axs[0].set_title(f'Absolute Error (slice z={index_z})')
+            axs[0].set_xlabel('X')
+            axs[0].set_ylabel('Y')
+            plt.colorbar(im0, ax=axs[0])
+
+            im1 = axs[1].imshow(slice_pred, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+            axs[1].set_title(f'Predicted Flux (slice z={index_z})')
+            axs[1].set_xlabel('X')
+            axs[1].set_ylabel('Y')
+            plt.colorbar(im1, ax=axs[1])
+
+            im2 = axs[2].imshow(slice_test, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+            axs[2].set_title(f'Reference Flux (slice z={index_z})')
+            axs[2].set_xlabel('X')
+            axs[2].set_ylabel('Y')
+            plt.colorbar(im2, ax=axs[2])
+
+            plt.tight_layout()
+            plt.savefig(save_dir + name)
+            plt.close()
+
+
+
+    @staticmethod
+    def viewErrorAndCurrents(mesh, p_error, p_pred, p_test, save_dir, name='error_currents_test.png', order='C'):
+        """
+        Visualize error, predicted, and test currents for 2D and 3D meshes.
+
+        Parameters:
+        - mesh: object with attributes ndim, xmin, xmax, centers...
+        - p_error, p_pred, p_test: list of tensors (length ndim) for each component current
+        - save_dir: directory to save the figure
+        - name: filename for the figure
+        - order: 'C' or 'F' for numpy reshape order
+        """
+
+        ndim = mesh.ndim
+        if ndim == 2:
+            centers = [center.detach().cpu().numpy() for center in mesh.centers]
+                
+            xmid, ymid = centers
+            xmin = mesh.xmin.detach().cpu().numpy()
+            xmax = mesh.xmax.detach().cpu().numpy()
+            nx, ny = xmid.shape[0], ymid.shape[0]
+            bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+            # Sizes for current components:
+            sizes = [(ny, nx + 1), (ny + 1, nx)]  # note: ny first because image vertical axis is Y
+            
+            P_error = [p_error[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+            P_pred = [p_pred[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+            P_test = [p_test[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+
+            fig = plt.figure(figsize=(20, 10))
+
+            for i in range(ndim):
+                # transpose if order=='F', else no transpose
+                data_error = P_error[i].T if order == 'F' else P_error[i]
+                data_pred = P_pred[i].T if order == 'F' else P_pred[i]
+                data_test = P_test[i].T if order == 'F' else P_test[i]
+
+                ax1 = plt.subplot(2, 3, 3 * i + 1)
+                im1 = plt.imshow(data_error, cmap='gist_earth', interpolation="none", aspect='auto',
+                                origin='lower', extent=bounds)
+                plt.colorbar(im1)
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                ax1.set_title("Absolute Error")
+
+                ax2 = plt.subplot(2, 3, 3 * i + 2)
+                im2 = plt.imshow(data_pred, cmap='rainbow', interpolation="none", aspect='auto',
+                                origin='lower', extent=bounds)
+                plt.colorbar(im2)
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                ax2.set_title("Predicted Solution")
+
+                ax3 = plt.subplot(2, 3, 3 * i + 3)
+                im3 = plt.imshow(data_test, cmap='rainbow', interpolation="none", aspect='auto',
+                                origin='lower', extent=bounds)
+                plt.colorbar(im3)
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                ax3.set_title("Reference Solution")
+
+            plt.savefig(save_dir + name)
+            plt.close()
+
+        elif ndim == 3:
+            
+            centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+            xmid, ymid, zmid = centers
+            xmin = mesh.xmin.detach().cpu().numpy()
+            xmax = mesh.xmax.detach().cpu().numpy()
+            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+            bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+            # Sizes for 3D current components
+            sizes = [(nx + 1, ny, nz), (nx, ny + 1, nz), (nx, ny, nz + 1)]
+
+            P_error = [p_error[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+            P_pred = [p_pred[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+            P_test = [p_test[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+
+            index_z = nz // 2  # slice in the middle along z-axis
+
+            fig = plt.figure(figsize=(20, 10))
+
+            for i in range(ndim):
+                # Slice at fixed z-index and transpose if needed
+                slice_error = P_error[i][:, :, index_z]
+                slice_pred = P_pred[i][:, :, index_z]
+                slice_test = P_test[i][:, :, index_z]
+
+                # Transpose for order='F', else no transpose
+                if order == 'F':
+                    slice_error = slice_error.T
+                    slice_pred = slice_pred.T
+                    slice_test = slice_test.T
+
+                ax1 = plt.subplot(3, 3, 3 * i + 1)
+                im1 = plt.imshow(slice_error, cmap='gist_earth', interpolation="none", aspect='auto',
+                                origin='lower', extent=bounds)
+                plt.colorbar(im1)
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                ax1.set_title("Absolute Error")
+
+                ax2 = plt.subplot(3, 3, 3 * i + 2)
+                im2 = plt.imshow(slice_pred, cmap='rainbow', interpolation="none", aspect='auto',
+                                origin='lower', extent=bounds)
+                plt.colorbar(im2)
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                ax2.set_title("Predicted Solution")
+
+                ax3 = plt.subplot(3, 3, 3 * i + 3)
+                im3 = plt.imshow(slice_test, cmap='rainbow', interpolation="none", aspect='auto',
+                                origin='lower', extent=bounds)
+                plt.colorbar(im3)
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                ax3.set_title("Reference Solution")
+
+            plt.savefig(save_dir + name)
+            plt.close()
+
+
+
+
     @staticmethod
     def export_flux_list(mesh, flux_list, filename="flux_data.vtr"):
         """
@@ -455,6 +892,66 @@ class visualization:
         # Save grid
         grid.save(filename)
         print(f"Saved {len(flux_list)} flux fields to '{filename}'")
+        
+        
+    def viewFlux3D_volume(mesh, phi_pred, order='F', mode='volume', iso_value=None, show=True, save_path=None):
+        """
+        Visualize 3D scalar flux using PyVista.
+
+        Parameters:
+        -----------
+        mesh : object
+            Mesh object with attributes: xmid = [x, y, z], ndim, xmin, xmax
+        phi_pred : torch.Tensor
+            Flux tensor of shape (N, 1)
+        order : str
+            Reshape order: 'F' or 'C'
+        mode : str
+            'volume' for volume rendering or 'iso' for isosurface
+        iso_value : float or None
+            Required for 'iso' mode to define isosurface value
+        show : bool
+            If True, shows the plot interactively
+        save_path : str or None
+            If provided, saves the plot as HTML (WebGL viewer)
+        """
+        assert mesh.ndim == 3, "Only 3D visualization is supported."
+        assert mode in ['volume', 'iso'], "mode must be 'volume' or 'iso'."
+
+        # Mesh grid
+        centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+        xmid, ymid, zmid = centers
+        xmin = mesh.xmin.detach().cpu().numpy()
+        xmax = mesh.xmax.detach().cpu().numpy()
+        nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+
+        # Reshape phi
+        phi_np = phi_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+
+        # Create a 3D grid
+        grid = pv.UniformGrid()
+        grid.dimensions = np.array(phi_np.shape) + 1  # one more than cells
+        grid.origin = (xmin[0], xmin[1],xmin[2])  # bottom-left-front
+        grid.spacing = (xmid[1] - xmid[0], ymid[1] - ymid[0], zmid[1] - zmid[0])     # dx, dy, dz
+
+        # Attach the scalar field
+        grid.cell_data["flux"] = phi_np.flatten(order=order)
+
+        # Initialize plotter
+        plotter = pv.Plotter()
+        if mode == 'volume':
+            plotter.add_volume(grid, scalars="flux", opacity="sigmoid", cmap="viridis")
+        elif mode == 'iso':
+            assert iso_value is not None, "iso_value must be specified for isosurface mode."
+            contour = grid.contour([iso_value])
+            plotter.add_mesh(contour, color='orange', opacity=0.75)
+
+        plotter.add_axes()
+        plotter.show_grid()
+        if save_path:
+            plotter.export_html(save_path)
+        if show:
+            plotter.show()
 
 
 

@@ -34,10 +34,18 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         self.stopping = False
 
         self.phi =  torch.ones(N, self.G, device=self.device)  # [N, G]
-        self.Sgr = self.chi.view(1,-1)*torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, G]
-        self.prevSgr = self.chi.view(1,-1)*torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, G]
-        self.Xh = torch.ones(N, self.G, device=self.device).view(-1,1)  # [N*G,1]
-        self.Fh = torch.ones(N, self.G, device=self.device).view(-1,1)  # [N*G,1]
+
+
+        # self.Sgr = self.chi.view(1,-1)*torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, G]
+        # self.prevSgr = self.chi.view(1,-1)*torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, G]
+        # self.Xh = torch.ones(N, self.G, device=self.device).view(-1,1)  # [N*G,1]
+        # self.Fh = torch.ones(N, self.G, device=self.device).view(-1,1)  # [N*G,1]
+
+        self.Sgr = torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, 1]
+        self.prevSgr = torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, 1]
+        self.Xh = torch.ones(N, 1, device=self.device) # [N,1]
+        self.Fh = torch.ones(N, 1, device=self.device)  # [N,1]
+
 
         self.keff = torch.tensor([1.0], device=self.device)
         self.keff_ref = torch.tensor([self.params_solver['keff_ref']], device=self.device) if self.params_solver['keff_ref'] else None
@@ -46,6 +54,8 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         self.anderson = self.params_solver.get('anderson', False)
         self.momentum = self.params_solver.get('momentum', False)
         self.verbose = self.params_solver.get('verbose', 0)
+        self.keff_method = self.params_solver.get('keff_method','scaled_rayleigh')
+        print(f"==>> keff_method: {self.keff_method}")
         # beta params for momentum
         self.beta1 = self.params_solver.get('beta1', 0.0)
         self.beta2 = self.params_solver.get('beta2', 0.0)
@@ -65,7 +75,23 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
 
         self.initialized = True # it is important to reset this parameter
 
-    
+    def update_cross_sections(self,X):
+        self.get_cross_sections(X)
+        # update Sgr
+        zeta = self.model.forward(X)
+        phi_list= self.unpack_solution(zeta,self.output_format)[0]
+        phi = torch.cat(phi_list, dim=1)  # [N, G]
+        fission_production = self.NuSigma_f * phi # [N, G]
+        S = torch.sum(fission_production,dim=1, keepdim=True)  # [N, 1]: 
+        # S = self.chi.view(1,-1)*total_fission  # [1,G]*[N, 1] =[N,G]
+        self.Sgr = S / (self.keff + 1e-12) # [N,1]
+        # reset history with new X
+        self.prevSgr = S / (self.keff + 1e-12) # [N,1]
+        # self.Xh = phi.view(-1,1)  # [N*G,1]
+        # self.Fh = phi.view(-1,1)  # [N*G,1]
+        self.Xh = self.prevSgr.detach().clone()  # [N,1]
+        self.Fh = self.Sgr.detach().clone()  # [N,1]
+
 
     def residual_PDE(self, X):
         """Compute PDE residual for multigroup neutron diffusion.
@@ -83,7 +109,7 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
             
         # Evaluate model predictions
         zeta = self.model(X)
-        phi_list, p_list = self.unpack_solution(zeta)  # unpack φ and p
+        phi_list, p_list = self.unpack_solution(zeta,self.output_format)  # unpack φ and p
         phi = torch.cat(phi_list, dim=1)      # [N, G]
         p = torch.stack(p_list, dim=1)        # [N, G, d]
 
@@ -109,8 +135,9 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
     
         # Compute divergence of current: div(p_g)
         div_p = torch.stack([operator.div(p[:, g, :], X) for g in range(self.G)], dim=1)   # [N, G, 1]
+
         # removal_term = torch.einsum('nij,nj->ni', Te, phi)
-        flux_constrain = div_p + torch.bmm(Te, phi.unsqueeze(-1)) - self.Sgr.unsqueeze(-1)     # [N, G, 1]
+        flux_constrain = div_p + torch.bmm(Te, phi.unsqueeze(-1)) - self.Sgr.unsqueeze(1) * self.chi[None, :, None]    # [N, G, 1]
         # Compute gradient constraints: 1/D * p_g + ∇phi_g
         grad_constraints = torch.stack([(p[:, g, :] / self.D[:, g:g+1]) + operator.grad(phi[:, g:g+1], X) for g in range(self.G)], dim=1)  # [N, G, d]
         residuals = torch.cat([flux_constrain, grad_constraints], dim=-1)  # [N, G, 1+d]
@@ -148,7 +175,7 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
                 self.Xh = torch.hstack([self.Xh[:, -self.m_anderson:], self.Sgr.view(-1,1)])
                 self.Fh = torch.hstack([self.Fh[:, -self.m_anderson:], Sgr.view(-1,1)])
                 S_temp = (1 - self.beta_anderson) * (self.Xh @ alpha) + self.beta_anderson * (self.Fh @ alpha)
-                S_updated = S_temp.view(-1,self.G)
+                S_updated = S_temp.view(-1,1)# (N,1)
         else:
             S_updated = Sgr.detach().clone()
 
@@ -164,20 +191,108 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         
         # Model output
         zeta = self.model.forward(X)
-        phi_list = self.unpack_solution(zeta,self.output_format)[0]
+        phi_list,J_list = self.unpack_solution(zeta,self.output_format)
         # Compute residual for inner solver norm
-        eq_residual = self.residual_PDE(X)  # [N, G*(1+d)]
+        eq_residual = self.residual_PDE(X)  # [N, G,(1+d)]
         bs_norm = torch.linalg.vector_norm(self.Sgr) + 1e-12  # avoid div by zero
         innerSolver = torch.linalg.vector_norm(eq_residual) / bs_norm
         
-        # Compute fission source S = Sigma_f * phi
+
         phi = torch.cat(phi_list, dim=1)  # [N, G]
-        fission_production = (self.NuSigma_f * phi).sum(dim=1, keepdim=True)  # [N, 1]
-        S = self.chi.view(1,-1)*fission_production  # [1,G]*[N, G] 
-        # Compute new keff (Rayleigh quotient)
-        numerator = torch.sum(S * S)
-        denominator = torch.sum(S * self.Sgr)
-        keff = numerator / (denominator + 1e-12)  # avoid div zero
+        # Fission production rate in group g
+        fission_production = self.NuSigma_f * phi # [N, G]
+        # Total fission neutron yield (integrated over all groups)
+        S = torch.sum(fission_production,dim=1, keepdim=True)  # [N, 1]: 
+        # S = self.chi.view(1,-1)*total_fission  # [1,G]*[N, 1] =[N,G]
+        # --- Compute keff using selected method ---
+        S_old = self.Sgr * self.keff  # recover old unnormalized source
+
+
+        if self.keff_method == "scaled_rayleigh":
+            numerator = torch.sum(S * S)
+            denominator = torch.sum(S * self.Sgr)
+            keff = numerator / (denominator + 1e-12)  # avoid div zero
+
+
+        elif self.keff_method == "rayleigh":
+            numerator = torch.sum(S * S)
+            denominator = torch.sum(S * S_old)
+            keff = numerator / (denominator + 1e-12)
+        elif self.keff_method == "projection":  
+            # least squares method
+            numerator = torch.sum(S * S_old)
+            denominator = torch.sum(S_old * S_old)
+            keff = numerator / (denominator + 1e-12)
+        elif self.keff_method == "power_method":
+            numerator = torch.linalg.vector_norm(S)
+            denominator  = torch.linalg.vector_norm(S_old) 
+            keff = numerator / (denominator + 1e-12)
+
+        elif self.keff_method == "scaled_norm":  
+            # least squares method
+            numerator = torch.sum(S * S)
+            denominator = torch.sum(self.Sgr * self.Sgr)
+            keff = torch.sqrt(numerator / (denominator + 1e-12))
+            
+        elif self.keff_method == "reaction_rate":
+            # 0.527
+            # Let us note that torch.sum(S) == torch.sum(self.NuSigma_f * phi)
+            # production = torch.sum(self.NuSigma_f * phi)
+            production = torch.sum(S) 
+            absorption = torch.sum(self.Sigma_r * phi)
+            J = torch.stack(J_list, dim=1)        # [N, G, d]
+            divJ = torch.stack([operator.div(J[:, g, :], X) for g in range(self.G)], dim=1)  # [N, G, 1]
+            # leakage = divJ.sum()
+            leakage = -torch.sum(divJ)  # negative because ∇·J = -leakage
+            keff = production / (absorption + leakage + 1e-12)
+            
+        elif self.keff_method == "reaction_rate_norm":
+            # Normalize flux (optional, for stability)
+            norm = torch.sum(phi) + 1e-12
+            phi_norm = phi / norm
+            # Compute total production rate ∫ νΣf φ
+            production = torch.sum(self.NuSigma_f * phi_norm)
+            # Compute total removal rate ∫ Σr φ
+            removal = torch.sum(self.Sigma_r * phi_norm)
+            # Estimate keff
+            keff = production / (removal + 1e-12)
+        
+        elif self.keff_method == "direct_normalization":
+            # --- Numerator: (χ ⋅ φ)(νΣf ⋅ φ) ---
+
+            # chi_phi = (self.chi * phi).sum(dim=1)            # [N]
+            # nu_fiss_phi = (self.NuSigma_f * phi).sum(dim=1)  # [N]
+            # numerator = torch.sum(chi_phi * nu_fiss_phi)         # scalar
+            numerator = torch.sum(S*phi)
+
+            # --- Denominator: inner product of φ and residual ---
+            # d = self.domain.input_dim
+            R_phi = eq_residual[:, :,0] +self.chi.view(1,-1)*self.Sgr # shape [N, G]
+            # R_total = eq_residual.sum(dim=2)  # shape: [N, G]
+            denominator = torch.sum(phi * R_phi)  # scalar
+            keff = numerator / (denominator + 1e-12) 
+        elif self.keff_method == "direct":
+        
+            numerator = torch.sum(S*S)
+
+            # --- Denominator: inner product of S and residual ---
+            # 
+            # p = torch.stack(J_list, dim=1)                           # [N, G, d]
+            # zeta = torch.cat([phi.unsqueeze(-1), p], dim=2)          # [N, G, 1 + d]
+
+            # Azeta = eq_residual.clone()  # shape [N, G, 1 + d]
+            # Azeta[:, :, 0] += (1 / self.keff) * S  # only add S to scalar flux residual
+
+            A_phi = eq_residual[:, :,0] +self.chi.view(1,-1)*self.Sgr # shape [N, G]
+            denominator =  torch.sum(A_phi * S) 
+
+            keff = numerator / (denominator + 1e-12) 
+
+        else:
+            print('The method is not implemented!')
+
+
+
         # Normalize new source
         Sgr = S / (keff + 1e-12)
 

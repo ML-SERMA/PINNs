@@ -27,6 +27,7 @@ class CartesianGeometry:
         obj.widths = [obj.edges[d][1:] - obj.edges[d][:-1] for d in range(obj.ndim)]
         obj.centers = [0.5 * (obj.edges[d][:-1] + obj.edges[d][1:]) for d in range(obj.ndim)]
         obj.nCell = torch.prod(obj.num_cells)
+        obj.device = device
         return obj
     def generate_mesh(self):
         self.widths = [
@@ -49,7 +50,7 @@ class CartesianGeometry:
     def refine_mesh(self, refinement_factors):
         '''
         refinement_factors = [[1, 2, 1, 1],  # for dim 0: subdivide second cell by 2, others remain
-                              [2, 2, 1, 1]]  # for dim 1: subdivide first two cells by 2, others remain
+                            [2, 2, 1, 1]]  # for dim 1: subdivide first two cells by 2, others remain
         '''
         new_edges, new_widths, new_centers, new_num_cells = [], [], [], []
 
@@ -167,8 +168,8 @@ class CartesianGeometry:
 
     def view_grid(self):
         if self.ndim == 2:
-            xs = self.edges[0]
-            ys = self.edges[1]
+            xs = self.edges[0].cpu()
+            ys = self.edges[1].cpu()
             ax = plt.gca()
             for i in range(len(xs) - 1):
                 for j in range(len(ys) - 1):

@@ -10,11 +10,14 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_multigroup_diffusion_eigenvalue import mixed_multigroup_diffusion_eigenvalue
+from pyPINNs.PDE.direct_mixed_multigroup_diffusion_eigenvalue import direct_mixed_multigroup_diffusion_eigenvalue
 from pyPINNs.Geometry.CartesianGeometry import CartesianGeometry
+from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Xs.cross_sections import XsContainer,XsEvaluator
 from pyPINNs.Tools.visualization import visualization
-from pyPINNs.Tools.saveResult import saveResult
+from pyPINNs.Tools.resampler import Resampler
+from pyPINNs.Tools.adaptive_loss import ResidualAttention
+from pyPINNs.Tools.regularizer import PhysicsRegularizer
 from pyPINNs.Tools.basic_utils import check_create_dir
 from pyPINNs.Model.neuron_network.FCN import FCN, FCN_FF
 from pyPINNs.Data.DataSet import DataSet
@@ -27,20 +30,22 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Takeda_model1_case2_SLR1e-3_Nit4000')
-parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=20*1024)
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EX_Direct_EP_Mixed_FCN_Takeda_model1_case1_SLR1e-3_Nit1000')
+parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=10*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[50,50,50])
-parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=2000000)
+parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=200000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[3]+5*[64]+[8])
-parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
+parser.add_argument('-a','--activation', type=str, help="activation function",default='Sin')
+parser.add_argument('-s','--sampling', type=str, help="sampling method",default='Sobol')
 parser.add_argument('-v', '--verbose',action='count', default=0)  
 
 args = parser.parse_args()
 
 name_folder = args.test + '_nc' + str(args.n_collocation) + '_nb' + str(args.n_boundary) \
-                + '_nt' + str(args.n_test) + '_ns' + str(args.n_step) + '_nn' + str(args.n_neuron)+'_'+str(args.activation)
+                + '_nt' + str(args.n_test) + '_ns' + str(args.n_step) + '_nn' + str(args.n_neuron)\
+                +'_'+str(args.activation) +'_'+str(args.sampling)
 save_dir = check_create_dir(results_dir+name_folder+'/')
 print(f"==>> save_dir: {name_folder}")
 
@@ -54,7 +59,9 @@ print(f"Running on {device}. Yes! ")
 
 # device = torch.device('cpu')
 
-params_domain = {'xmin':[0, 0, 0], 'xmax':[25, 25, 25],'boundary_conditions': [['REFLECTION', 'VACUUM'],['REFLECTION', 'VACUUM'],['REFLECTION', 'VACUUM']]}
+params_domain = {'xmin':[0, 0, 0], 'xmax':[25, 25, 25],
+                'boundary_conditions': [['REFLECTION', 'VACUUM'],['REFLECTION', 'VACUUM'],['REFLECTION', 'VACUUM']],
+                'type_of_points':args.sampling}
 params_data = {'n_collocation':args.n_collocation,'n_boundary':args.n_boundary,'n_test':args.n_test,
                 'random_seed':2024,'device':device}
 
@@ -65,8 +72,8 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
                 'fourier_mapping_size':None,'hard_BC':'Takeda1'}
 
 params_solver = {'momentum':False,'beta1':0.0,'beta2':0.8,
-                'num_inner_iters':4000, 'keff_ref':0.93113,'verbose':2, 'save_dir':save_dir,
-                'anderson':False,'beta':0.8,'m':4}
+                'num_inner_iters':1000, 'keff_ref':0.92818,'verbose':2, 'save_dir':save_dir, 'keff_method':'scaled_rayleigh',
+                'anderson':False,'beta':0.8,'m':4} 
 
 
 
@@ -75,22 +82,22 @@ params_solver = {'momentum':False,'beta1':0.0,'beta2':0.8,
 
 pdeDomain = SquareDomain(**params_domain)
 pdeData = DataSet(domain=pdeDomain,**params_data)
-# pdeData.generate_phi_test(load_dir = data_dir+'EP_C5G7/RefFlux120',multigroup=True)
-# pdeData.generate_p_test(load_dir = data_dir+'EP_C5G7/RefCurrents120',multigroup=True)
+pdeData.generate_phi_test(load_dir = data_dir+'TakedaModel1Case1/RefFlux50',multigroup=True)
+pdeData.generate_p_test(load_dir = data_dir+'TakedaModel1Case1/RefCurrents50',multigroup=True)
 
 
 
 
 geometry = CartesianGeometry(ndim=3,xmin=[0, 0, 0],xmax=[25, 25, 25],num_cells=[5, 5, 5],device=device)
-materialName = [ "COR" , "REF" ,"CR"]
+materialName = [ "COR" , "REF" ,"VOID"]
 nmat = len(materialName)
 COR = 0
 REF = 1
-CR = 2
-regionsName=[ "COR" , "REF" ,"CR"]
+VOID = 2
+regionsName=[ "COR" , "REF" ,"VOID"]
 regions =  [[REF, 0, 5, 0, 5, 0, 5],
             [COR, 0, 3, 0, 3, 0, 3],
-            [CR,  3, 4, 0, 1, 0, 5],
+            [VOID,  3, 4, 0, 1, 0, 5],
             ]
 
 geometry.setRegionsName(regionsName=regionsName)
@@ -107,8 +114,8 @@ ngroup =2
 xsContainer = XsContainer(num_groups=ngroup,num_materials=nmat,device=device)
 
 
-tTotal0 = [ 2.23775E-01 , 2.50367E-01 , 8.52325E-02 ]
-tTotal1 = [ 1.03864 , 1.64482 ,  2.17460E-01  ]
+tTotal0 = [ 2.23775E-01 , 2.50367E-01 , 1.28407E-02 ]
+tTotal1 = [ 1.03864 , 1.64482 ,  1.20676E-02  ]
 xsContainer.setTotal(tTotal0, 0)
 xsContainer.setTotal(tTotal1, 1)
 
@@ -132,10 +139,10 @@ xsContainer.setDiffusion(tD1, group_idx=1)
 
 
 
-tScatter00 = [  1.92423E-01, 1.93446E-01, 6.77241E-02 ]
+tScatter00 = [  1.92423E-01, 1.93446E-01, 1.27700E-02 ]
 tScatter01 = [ 0.0,0.0,0.0] 
-tScatter10 = [  2.28253E-02 , 5.65042E-02,  6.45461E-05 ]
-tScatter11 = [ 8.80439E-01 , 1.62452 , 3.52358E-02 ]
+tScatter10 = [  2.28253E-02 , 5.65042E-02,  2.40997E-05 ]
+tScatter11 = [ 8.80439E-01 , 1.62452 , 1.07387E-02 ]
 
 xsContainer.setScattering(tScatter00, 0, 0)
 xsContainer.setScattering(tScatter10, 1, 0)
@@ -187,13 +194,41 @@ print('model',model_fcn)
 
 
 # Training Time
-mypde = mixed_multigroup_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
-optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
+mypde = direct_mixed_multigroup_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
+
+#Adam
+# parameters = [*mypde.model.parameters(), mypde.keff]
+# optimizer = torch.optim.Adam(parameters, lr=1.e-3,weight_decay=0.0)
+
+
+optimizer = torch.optim.Adam([
+    {"params": mypde.model.parameters()},
+    {"params": [mypde.keff_param], "lr": 1e-1}
+], lr=1e-3)
+
+
+
+# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.98)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
+# LBFGS
+# optimizer_LBFGS = torch.optim.LBFGS(mypde.model.parameters(),lr=0.1,line_search_fn="strong_wolfe")
+# scheduler = torch.optim.lr_scheduler.StepLR(optimizer_LBFGS, step_size=200, gamma=0.95)
+# mypde.compile(optimizer=optimizer_LBFGS,scheduler=scheduler)
 
-train(mypde,pdeData,**params_train)
+
+# resampler = Resampler(mypde,pdeData,save_dir=save_dir,interval=1e5,min_iter=1e5,max_iter=1e6,method='EVO')
+# RA_loss = ResidualAttention(lr=1e-3, temperature=1.0, mode="all")
+
+# load model before train
+# mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
+
+myRegularizer = PhysicsRegularizer(weight_mass=1)
+
+train(mypde,pdeData,**params_train,adaptive_loss=None,resampler=None,physics_regularizer=myRegularizer)
+
+
 
 # Model Accuracy 
 mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
@@ -201,32 +236,31 @@ solution = mypde.full_predict(pdeData.X_test)
 
 phi_pred= mypde.unpack_solution(solution)[0] 
 
-ngroup =2
-for igroup in range(ngroup):
-    visualization.viewSolution(params_domain,args.n_test,phi_pred[igroup],save_dir+'flux_group_'+str(igroup)+'.png')
-visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=False,Error_p=False)
-
-# save file
-
 mesh = CartesianGeometry(ndim=3,xmin=params_domain['xmin'],xmax=params_domain['xmax'],num_cells=args.n_test)
-
 visualization.export_flux_list(mesh,phi_pred,filename= save_dir+'flux_data.vtr')
 
 
-show_flux = False
-if show_flux:
-    phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True,ngroup=2)
-    for igroup in range(ngroup):
-        visualization.viewErrorAndSolution(params_domain,args.n_test,phi_AE[igroup],phi_pred[igroup],phi_test[igroup],
-                                            save_dir,'error_phi_group_'+str(igroup)+'.png')
+visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
 
-show_currents = False
-if show_currents:
+ngroup =2
+for igroup in range(ngroup):
+    visualization.viewFlux(mesh,phi_pred[igroup],save_dir,'flux_group_'+str(igroup)+'.png',order='F')
+
+
+show_flux = True
+if show_flux:
+    phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)
     for igroup in range(ngroup):
-        p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,
-                                                                mass_pred=mass_phi_pred,mass_test=mass_phi_test,ngroup=2)
-        visualization.viewErrorAndCurrents(params_domain,args.n_test,p_AE[igroup],p_pred[igroup],p_test[igroup],
-                                            save_dir,'error_current_group_'+str(igroup)+'.png')
+        visualization.viewErrorAndFlux(mesh,phi_AE[igroup],phi_pred[igroup],phi_test[igroup],
+                                        save_dir,'error_phi_group_'+str(igroup)+'.png',order='F')
+
+show_currents = True
+if show_currents:
+    p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,
+                                                                mass_pred=mass_phi_pred,mass_test=mass_phi_test)
+    for igroup in range(ngroup):
+        visualization.viewErrorAndCurrents(mesh,p_AE[igroup],p_pred[igroup],p_test[igroup],
+                                            save_dir,'error_current_group_'+str(igroup)+'.png',order='F')
         
 visualization.show_history_residuals(pathFile=save_dir+'train.csv',save_dir=save_dir,keff_ref_exist=True)
 

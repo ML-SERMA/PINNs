@@ -65,11 +65,11 @@ def get_activation(name):
         return torch.nn.Softplus(beta=4)
     elif name in ['celu', 'CeLU']:
         return torch.nn.CELU()
-    elif name in ['swish']:
+    elif name in ['swish','Swish']:
         return Swish()
-    elif name in ['sin']:
+    elif name in ['sin','Sin']:
         return Sin()
-    elif name in ['snake']:
+    elif name in ['snake','Snake']:
         return Snake()
     elif name in ['RegionBase']:
         return RegionBasedActivation()

@@ -27,8 +27,114 @@ class mixed_multigroup_diffusion(pdeBase):
                 
         else:  # block format: 
             phi_list = [zeta[:, g:g+1] for g in range(G)]           #  G elements of [N, 1]
-            p_list = [zeta[:, G + g*d: G + (g+1)*d]   for g in range(G)] #  Gelement of [N, d]
+            p_list = [zeta[:, G + g*d: G + (g+1)*d]   for g in range(G)] #  G element of [N, d]
         return phi_list, p_list
+    
+    def phi_predict(self,X_test):
+        zeta = self.model.forward(X_test)
+        phi_list = self.unpack_solution(zeta,output_format=self.output_format)[0]
+        return phi_list
+    
+    def my_currents_predict(self, Xc_test):
+        """
+        Predict current components J_{g,d} using unpack_solution.
+
+        Args:
+            Xc_test (list of torch.Tensor): List of length ndim, where each element is a [N, input_dim]
+                tensor with test points specific to direction d.
+
+        Returns:
+            List[List[Tensor]]: p_pred[g][d] = J_g^d at points Xc_test[d], shape [N, 1]
+        """
+        ndim = self.domain.input_dim
+        G = self.G
+        output_format = self.output_format  # either 'interleaved' or 'block'
+
+        p_pred = []
+
+        for g in range(G):
+            group_currents = []
+            for d in range(ndim):
+                z_d = self.model.forward(Xc_test[d])
+                _, current_list = self.unpack_solution(z_d, output_format=output_format)
+                j_gd = current_list[g][:, d : d + 1]  # select the d-th component of J_g
+                group_currents.append(j_gd)
+            p_pred.append(group_currents)
+
+        return p_pred  # shape: [G][ndim], each [N, 1]
+
+    
+    def currents_predict(self,Xc_test):
+        ndim = self.domain.input_dim
+        ngroup = self.G
+        p_pred = [[self.model.forward(Xc_test[idim])[:,igroup*(ndim+1) + (idim+1): igroup*(ndim+1) +(idim+2)] for idim in range(ndim)] for igroup in range(ngroup)]
+        return p_pred
+    
+    # def currents_predict(self, Xc_test):
+    #     """
+    #     Predicts current components J_{g,d} from the model for each group g and direction d.
+
+    #     Works with two output formats:
+    #         - 'interleave': [φ₀, J₀¹, ..., J₀^d, φ₁, J₁¹, ..., φ_G, J_G^d]
+    #         - 'block':       [φ₀, φ₁, ..., φ_G, J₀¹, ..., J_G^d]
+
+    #     Args:
+    #         Xc_test (list of torch.Tensor): list of length ndim,
+    #             where Xc_test[d] is the test set for direction d (shape [N, input_dim])
+
+    #     Returns:
+    #         p_pred[g][d] = J_g^d evaluated at points Xc_test[d], shape [N, 1]
+    #     """
+    #     ndim = self.domain.input_dim
+    #     G = self.G
+
+    #     p_pred = []
+
+    #     for g in range(G):
+    #         group_currents = []
+    #         for d in range(ndim):
+    #             z_d = self.model.forward(Xc_test[d])
+    #             if self.output_format == 'interleave':
+    #                 idx = g * (ndim + 1) + (d + 1)
+    #             else:  # block
+    #                 idx = G + g * ndim + d
+    #             j_gd = z_d[:, idx : idx + 1]
+    #             group_currents.append(j_gd)
+    #         p_pred.append(group_currents)
+
+    #     return p_pred  # shape: [G][ndim], each [N, 1]
+
+    
+    def get_phi_test(self,X_test,phi_test,normalization=False):
+
+        ngroup = self.G
+        phi_pred = self.phi_predict(X_test) 
+        mass_phi_pred = torch.sum(torch.vstack(phi_pred))
+        # print(f"==>> mass_phi_pred: {mass_phi_pred}")
+        mass_phi_test = torch.sum(torch.vstack(phi_test))
+        # print(f"==>> mass_phi_test: {mass_phi_test}")
+        if normalization:
+            phi_pred = [phi_pred[igroup]/mass_phi_pred for igroup in range(ngroup)]
+            phi_test = [phi_test[igroup]/mass_phi_test for igroup in range(ngroup)]
+        phi_AE = [torch.abs(phi_test[igroup]-phi_pred[igroup]) for igroup in range(ngroup)]
+        phi_REL_L2 = torch.linalg.vector_norm(torch.vstack(phi_test)-torch.vstack(phi_pred))/torch.linalg.vector_norm(torch.vstack(phi_test)) 
+        return phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test
+    
+    def get_currents_test(self,Xc_test,p_test,normalization=False,mass_pred=1.0,mass_test=1.0):
+    
+        p_pred = self.currents_predict(Xc_test)
+        ngroup = self.G
+        if normalization:
+            p_pred = [ [ p_pred[igroup][idim]/mass_pred for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+            p_test = [ [ p_test[igroup][idim]/mass_test for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+
+        p_AE    = [[torch.abs(p_test[igroup][idim]-p_pred[igroup][idim]) for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]# list
+        p_AE_g  = [ torch.vstack(p_AE[igroup])    for igroup in range(ngroup)]
+        p_test_g = [torch.vstack(p_test[igroup])    for igroup in range(ngroup)]
+        p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE_g))/torch.linalg.vector_norm(torch.vstack(p_test_g)) 
+    
+        return p_REL_L2, p_AE, p_pred, p_test
+    
     
     def get_cross_sections(self,X):
         if self.params_pde.get('XsEvaluater',None):
@@ -37,8 +143,11 @@ class mixed_multigroup_diffusion(pdeBase):
             self.D = xsEvaluater.diffusion(X)
             self.Sigma_r = xsEvaluater.sigma_r(X)
             self.Sigma_s = xsEvaluater.sigma_s(X)
+            
             self.NuSigma_f = xsEvaluater.nusigma_f(X)
             self.chi = xsEvaluater.fission_spectrum()
+            
+            self.Sf = xsEvaluater.source(X)
         else:
             print(" get cross sections from direct functions")
             self.D = self.params_pde['func_D'](X).to(self.device)              # [N, G]
@@ -48,14 +157,16 @@ class mixed_multigroup_diffusion(pdeBase):
                 self.Sigma_s = self.params_pde['func_Sigma_s'](X).to(self.device)  # [N, G, G]
             else:
                 self.Sigma_s = torch.zeros(X.shape[0],1,1,device=self.device)
-                
+            # source problem
+            if self.params_pde.get('func_Sf',None):
+                self.Sf = self.params_pde['func_Sf'](X).to(self.device) # [N, G]  
+            # eigenvalue problem
             if self.params_pde.get('func_NuSigma_f',None):
                 self.NuSigma_f = self.params_pde['func_NuSigma_f'](X).to(self.device) # [N, G]
-
-            if self.params_pde.get('func_Sf',None):
-                self.Sf = self.params_pde['func_Sf'](X).to(self.device) # [N, G]
             self.chi = self.params_pde.get('chi',None).to(self.device) # [G]
 
+    # def update_training_points(self, new_X):
+    #     self.get_cross_sections(new_X)
 
     def residual_PDE(self, X):
         """
@@ -66,7 +177,6 @@ class mixed_multigroup_diffusion(pdeBase):
             T_e(g, g') = Σ_r if g = g'
                         -Σ_s(g'→g) if g ≠ g'
         """
-       
         NotImplemented("The function Dirichlet_BC is not implemented") 
     
     

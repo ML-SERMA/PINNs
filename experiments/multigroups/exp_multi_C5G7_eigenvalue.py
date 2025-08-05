@@ -10,8 +10,8 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_two_group_diffusion_eigenvalue import mixed_two_group_diffusion_eigenvalue
 from pyPINNs.PDE.mixed_multigroup_diffusion_eigenvalue import mixed_multigroup_diffusion_eigenvalue
+from pyPINNs.Geometry.CartesianGeometry import CartesianGeometry
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.saveResult import saveResult
@@ -31,7 +31,7 @@ parser.add_argument('-t','--test', type=str, help="name of test case",default='E
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=20*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[120,120])
-parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=100000)
+parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=2000000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[2]+5*[64]+[6])
 parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
@@ -227,7 +227,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
 
-train(mypde,pdeData,**params_train)
+# train(mypde,pdeData,**params_train)
 
 # Model Accuracy 
 mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
@@ -235,26 +235,32 @@ solution = mypde.full_predict(pdeData.X_test)
 
 phi_pred= mypde.unpack_solution(solution)[0] 
 
+mesh = CartesianGeometry(ndim=2,xmin=params_domain['xmin'],xmax=params_domain['xmax'],num_cells=args.n_test)
+visualization.export_flux_list(mesh,phi_pred,filename= save_dir+'flux_data.vtr')
+
+visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
+
 ngroup =2
 for igroup in range(ngroup):
     visualization.viewSolution(params_domain,[120,120],phi_pred[igroup],save_dir+'flux_group_'+str(igroup)+'.png')
-visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
+    visualization.viewFlux(mesh,phi_pred[igroup],save_dir,'flux_group_'+str(igroup)+'.png',order='C')
 
-phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True,ngroup=2)
+
+phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)
 
 for igroup in range(ngroup):
-    # minE = torch.min(phi_AE[igroup])
-    # maxE =torch.max(phi_AE[igroup])
-    # minF = torch.min(torch.stack([torch.min(phi_pred[igroup]),torch.min(phi_test[igroup])]))
-    # maxF = torch.max(torch.stack([torch.max(phi_pred[igroup]),torch.max(phi_test[igroup])]))
-    # visualization.viewErrorAndSolutionScale(params_domain,[120,120],phi_AE[igroup],phi_pred[igroup],phi_test[igroup],save_dir,'error_phi_group_'+str(igroup)+'.png',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
-    visualization.viewErrorAndSolution(params_domain,[120,120],phi_AE[igroup],phi_pred[igroup],phi_test[igroup],save_dir,'error_phi_group_'+str(igroup)+'.png')
+    # visualization.viewErrorAndSolution(params_domain,[120,120],phi_AE[igroup],phi_pred[igroup],phi_test[igroup],save_dir,'error_phi_group_'+str(igroup)+'.png')
+    visualization.viewErrorAndFlux(mesh,phi_AE[igroup],phi_pred[igroup],phi_test[igroup],
+                                        save_dir,'error_phi_group_'+str(igroup)+'.png',order='C')
 
 show_currents = True
 if show_currents:
     for igroup in range(ngroup):
-        p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,mass_pred=mass_phi_pred,mass_test=mass_phi_test,ngroup=2)
-        visualization.viewErrorAndCurrents(params_domain,[120,120],p_AE[igroup],p_pred[igroup],p_test[igroup],save_dir,'error_current_group_'+str(igroup)+'.png')
+        p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,mass_pred=mass_phi_pred,mass_test=mass_phi_test)
+        # visualization.viewErrorAndCurrents(params_domain,[120,120],p_AE[igroup],p_pred[igroup],p_test[igroup],save_dir,'error_current_group_'+str(igroup)+'.png')
+        visualization.viewErrorAndCurrents(mesh,
+                                                p_AE[igroup],p_pred[igroup],p_test[igroup],
+                                                save_dir,'error_current_group_'+str(igroup)+'.png',order='C')
         
 visualization.show_history_residuals(pathFile=save_dir+'train.csv',save_dir=save_dir,keff_ref_exist=True)
 

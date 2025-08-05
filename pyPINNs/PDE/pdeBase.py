@@ -134,73 +134,73 @@ class pdeBase():
         pred = self.model.forward(X_test)
         return pred
     
-    def phi_predict(self,X_test,ngroup=1):
-        if ngroup ==1:
-            phi_pred = self.model.forward(X_test)[:,0:1]
-        else:
-            ndim = self.domain.input_dim
-            phi_pred = [self.model.forward(X_test)[:,igroup*(ndim+1):igroup*(ndim+1)+1]  for igroup in range(ngroup)]
-        return phi_pred
+    # def phi_predict(self,X_test,ngroup=1):
+    #     if ngroup ==1:
+    #         phi_pred = self.model.forward(X_test)[:,0:1]
+    #     else:
+    #         ndim = self.domain.input_dim
+    #         phi_pred = [self.model.forward(X_test)[:,igroup*(ndim+1):igroup*(ndim+1)+1]  for igroup in range(ngroup)]
+    #     return phi_pred
     
-    def currents_predict(self,Xc_test,ngroup=1):
-        if ngroup ==1:
-            p_pred = [self.model.forward(Xc_test[idim])[:,idim+1:idim+2] for idim in range(self.domain.input_dim)]
-        else:
-            ndim = self.domain.input_dim
-            p_pred = [[self.model.forward(Xc_test[idim])[:,igroup*(ndim+1) + (idim+1): igroup*(ndim+1) +(idim+2)] for idim in range(ndim)] for igroup in range(ngroup)]
-        return p_pred
+    # def currents_predict(self,Xc_test,ngroup=1):
+    #     if ngroup ==1:
+    #         p_pred = [self.model.forward(Xc_test[idim])[:,idim+1:idim+2] for idim in range(self.domain.input_dim)]
+    #     else:
+    #         ndim = self.domain.input_dim
+    #         p_pred = [[self.model.forward(Xc_test[idim])[:,igroup*(ndim+1) + (idim+1): igroup*(ndim+1) +(idim+2)] for idim in range(ndim)] for igroup in range(ngroup)]
+    #     return p_pred
 
-    def get_phi_test(self,X_test,phi_test,normalization=False,ngroup=None):
-        if ngroup is None:
-            phi_pred = self.phi_predict(X_test)
-            mass_phi_pred = torch.sum(phi_pred)
-            mass_phi_test = torch.sum(phi_test)
-            if normalization:
-                phi_pred = phi_pred/mass_phi_pred
-                phi_test = phi_test/mass_phi_test
+    # def get_phi_test(self,X_test,phi_test,normalization=False,ngroup=None):
+    #     if ngroup is None:
+    #         phi_pred = self.phi_predict(X_test)
+    #         mass_phi_pred = torch.sum(phi_pred)
+    #         mass_phi_test = torch.sum(phi_test)
+    #         if normalization:
+    #             phi_pred = phi_pred/mass_phi_pred
+    #             phi_test = phi_test/mass_phi_test
         
-            phi_AE = torch.abs(phi_test-phi_pred)
-            phi_REL_L2 = torch.linalg.vector_norm(phi_test-phi_pred)/torch.linalg.vector_norm(phi_test)
+    #         phi_AE = torch.abs(phi_test-phi_pred)
+    #         phi_REL_L2 = torch.linalg.vector_norm(phi_test-phi_pred)/torch.linalg.vector_norm(phi_test)
             
-        else:
-            phi_pred = self.phi_predict(X_test,ngroup) # mass_phi = [torch.sum(phi_pred[igroup]) for igroup in range(ngroup)]
-            mass_phi_pred = torch.sum(torch.vstack(phi_pred))
-            mass_phi_test = torch.sum(torch.vstack(phi_test))
-            if normalization:
-                phi_pred = [phi_pred[igroup]/mass_phi_pred for igroup in range(ngroup)]
-                phi_test = [phi_test[igroup]/mass_phi_test for igroup in range(ngroup)]
+    #     else:
+    #         phi_pred = self.phi_predict(X_test,ngroup) # mass_phi = [torch.sum(phi_pred[igroup]) for igroup in range(ngroup)]
+    #         mass_phi_pred = torch.sum(torch.vstack(phi_pred))
+    #         mass_phi_test = torch.sum(torch.vstack(phi_test))
+    #         if normalization:
+    #             phi_pred = [phi_pred[igroup]/mass_phi_pred for igroup in range(ngroup)]
+    #             phi_test = [phi_test[igroup]/mass_phi_test for igroup in range(ngroup)]
         
-            phi_AE = [torch.abs(phi_test[igroup]-phi_pred[igroup]) for igroup in range(ngroup)]
-            phi_REL_L2 = torch.linalg.vector_norm(torch.vstack(phi_test)-torch.vstack(phi_pred))/torch.linalg.vector_norm(torch.vstack(phi_test)) 
+    #         phi_AE = [torch.abs(phi_test[igroup]-phi_pred[igroup]) for igroup in range(ngroup)]
+    #         phi_REL_L2 = torch.linalg.vector_norm(torch.vstack(phi_test)-torch.vstack(phi_pred))/torch.linalg.vector_norm(torch.vstack(phi_test)) 
  
 
-        return phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test
+    #     return phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test
     
-    def get_currents_test(self,Xc_test,p_test,normalization=False,mass_pred=1.0,mass_test=1.0,ngroup=None):
-        if ngroup is None:
-            p_pred = self.currents_predict(Xc_test)
-            if normalization:
-                p_pred = [ p_pred[idim]/mass_pred for idim in range(self.domain.input_dim)]
-                p_test = [ p_test[idim]/mass_test for idim in range(self.domain.input_dim)]
+    # def get_currents_test(self,Xc_test,p_test,normalization=False,mass_pred=1.0,mass_test=1.0,ngroup=None):
+    #     if ngroup is None:
+    #         p_pred = self.currents_predict(Xc_test)
+    #         if normalization:
+    #             p_pred = [ p_pred[idim]/mass_pred for idim in range(self.domain.input_dim)]
+    #             p_test = [ p_test[idim]/mass_test for idim in range(self.domain.input_dim)]
 
-            p_AE    = [torch.abs(p_test[idim]-p_pred[idim]) for idim in range(self.domain.input_dim)] # list
-            p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE))/torch.linalg.vector_norm(torch.vstack(p_test)) # scalar
+    #         p_AE    = [torch.abs(p_test[idim]-p_pred[idim]) for idim in range(self.domain.input_dim)] # list
+    #         p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE))/torch.linalg.vector_norm(torch.vstack(p_test)) # scalar
 
-        else:
-            p_pred = self.currents_predict(Xc_test,ngroup)
-            if normalization:
-                p_pred = [ [ p_pred[igroup][idim]/mass_pred for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
-                p_test = [ [ p_test[igroup][idim]/mass_test for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+    #     else:
+    #         p_pred = self.currents_predict(Xc_test,ngroup)
+    #         if normalization:
+    #             p_pred = [ [ p_pred[igroup][idim]/mass_pred for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+    #             p_test = [ [ p_test[igroup][idim]/mass_test for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
 
-            p_AE    = [[torch.abs(p_test[igroup][idim]-p_pred[igroup][idim]) for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]# list
+    #         p_AE    = [[torch.abs(p_test[igroup][idim]-p_pred[igroup][idim]) for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]# list
 
-            p_AE_g  = [ torch.vstack(p_AE[igroup])    for igroup in range(ngroup)]
-            p_test_g = [torch.vstack(p_test[igroup])    for igroup in range(ngroup)]
-            p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE_g))/torch.linalg.vector_norm(torch.vstack(p_test_g)) 
-            # p_REL_L2 =  [torch.linalg.vector_norm(torch.vstack(p_AE[igroup]))/torch.linalg.vector_norm(torch.vstack(p_test[igroup])) for igroup in range(ngroup)] 
-            # print(f"==>> p_REL_L2: {p_REL_L2}")
+    #         p_AE_g  = [ torch.vstack(p_AE[igroup])    for igroup in range(ngroup)]
+    #         p_test_g = [torch.vstack(p_test[igroup])    for igroup in range(ngroup)]
+    #         p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE_g))/torch.linalg.vector_norm(torch.vstack(p_test_g)) 
+    #         # p_REL_L2 =  [torch.linalg.vector_norm(torch.vstack(p_AE[igroup]))/torch.linalg.vector_norm(torch.vstack(p_test[igroup])) for igroup in range(ngroup)] 
+    #         # print(f"==>> p_REL_L2: {p_REL_L2}")
 
-        return p_REL_L2, p_AE, p_pred, p_test
+    #     return p_REL_L2, p_AE, p_pred, p_test
     
     #===========================================================================================================================
     

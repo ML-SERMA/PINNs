@@ -132,12 +132,20 @@ class FCN_FF(torch.nn.Module):
                 xy_qy   = x[:,1:2]/64.26
                 at = torch.hstack((xy_phi,xy_qx,xy_qy,xy_phi,xy_qx,xy_qy))
                 a= a*at
+                
             elif self.hard_BC == '2G_C5G7_L1':
                 xy_phi = (1.0-x[:,0:1])*(1.0-x[:,1:2])
                 xy_qx   = x[:,0:1]
                 xy_qy   = x[:,1:2]
                 at = torch.hstack((xy_phi,xy_qx,xy_qy,xy_phi,xy_qx,xy_qy))
                 a= a*at
+            elif self.hard_BC == 'TWIGL_2D':
+                xy_phi = (80.0-x[:,0:1])/80.0*(80.0-x[:,1:2])/80.0
+                xy_qx   = x[:,0:1]/80.0
+                xy_qy   = x[:,1:2]/80.0
+                at = torch.hstack((xy_phi,xy_qx,xy_qy,xy_phi,xy_qx,xy_qy))
+                a= a*at
+                
             elif self.hard_BC == 'curl_mixed_L1':
                 xt = x[:,0:1]*(1-x[:,0:1])
                 yt = x[:,1:2]*(1-x[:,1:2])

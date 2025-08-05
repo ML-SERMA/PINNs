@@ -157,7 +157,7 @@ class SquareDomain:
 
 
 
-    def add_test_points(self,n_test):
+    def add_test_points(self,n_test,order_style='F'):
         
         # params_mesh = params_mesh = {'ndim':2, 'xmin':[0, 0], 'xmax':[100, 100], 'nmail':[n_test, n_test]}
         if not isinstance(n_test, list):
@@ -165,24 +165,29 @@ class SquareDomain:
 
         params_mesh = params_mesh = {'ndim':self.input_dim, 'xmin':self.min_values.tolist(), 'xmax':self.max_values.tolist(), 'nmail':n_test}
         mesh = CartesianMesh(**params_mesh)
+        
         if self.input_dim ==2 :
-            X, Y     = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xmid[1]))
-            X_test   = np.hstack((X.flatten()[:,None], Y.flatten()[:,None]))  
-            x_test = torch.tensor(X_test)
+            # X, Y     = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xmid[1]))
+            # X_test   = np.hstack((X.flatten()[:,None], Y.flatten()[:,None]))  
+            # x_test = torch.tensor(X_test)
+            
+            # Create a 2D meshgrid of the midpoints along each axis
+            X, Y = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xmid[1]), indexing='ij')
+            
+            # Flatten and combine into (N, 2) points where N = number of grid points
+            X_test = np.hstack((X.flatten(order='C')[:, None], Y.flatten(order='C')[:, None]))
+
+            # Convert to torch tensor for model input
+            x_test = torch.tensor(X_test, dtype=torch.float32)
+            
         elif self.input_dim == 3:
             # Create a 3D meshgrid from the midpoints along each axis
-            X, Y, Z = np.meshgrid(
-                np.array(mesh.xmid[0]),  # x-axis midpoints
-                np.array(mesh.xmid[1]),  # y-axis midpoints
-                np.array(mesh.xmid[2]),  # z-axis midpoints
-                indexing='ij'  # ensures the axes are in (x, y, z) order
-            )
-
+            X, Y, Z = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xmid[1]),np.array(mesh.xmid[2]), indexing='ij')
             # Flatten and stack into a (N, 3) array where each row is a (x, y, z) point
             X_test = np.hstack((
-                X.flatten()[:, None],
-                Y.flatten()[:, None],
-                Z.flatten()[:, None]
+                X.flatten(order=order_style)[:, None],
+                Y.flatten(order=order_style)[:, None],
+                Z.flatten(order=order_style)[:, None]
             ))
 
             # Convert to a PyTorch tensor
@@ -190,52 +195,50 @@ class SquareDomain:
         else:
             print('check again ndim')
         
-        
         return x_test
-    def add_currents_points(self,n_test):
+    
+    def add_currents_points(self,n_test,order_style='F'):
         if not isinstance(n_test, list):
             n_test = [n_test for idim in range(self.input_dim)]
 
         params_mesh = params_mesh = {'ndim':self.input_dim, 'xmin':self.min_values.tolist(), 'xmax':self.max_values.tolist(), 'nmail':n_test}
         mesh = CartesianMesh(**params_mesh)
+        
         if self.input_dim ==2:
             # construct mesh for currents
             Xp,Yp = np.meshgrid(np.array(mesh.xpos[0]), np.array(mesh.xmid[1]))
-            xp_test = torch.tensor(np.hstack((Xp.flatten()[:,None], Yp.flatten()[:,None])))
-            
+            xp_test = torch.tensor(np.hstack((Xp.flatten(order='C')[:,None], Yp.flatten(order='C')[:,None])))
             Xq,Yq = np.meshgrid(np.array(mesh.xmid[0]), np.array(mesh.xpos[1]))
-            xq_test = torch.tensor(np.hstack((Xq.flatten()[:,None], Yq.flatten()[:,None])))
-            
+            xq_test = torch.tensor(np.hstack((Xq.flatten(order='C')[:,None], Yq.flatten(order='C')[:,None])))
             xc_test=[xp_test,xq_test]
+            
         elif self.input_dim == 3:
             # J_x: (xpos[0], xmid[1], xmid[2])
             Xp, Yp, Zp = np.meshgrid(mesh.xpos[0], mesh.xmid[1], mesh.xmid[2], indexing='ij')
             xp_test = torch.tensor(np.hstack((
-                Xp.flatten()[:, None],
-                Yp.flatten()[:, None],
-                Zp.flatten()[:, None]
+                Xp.flatten(order = order_style)[:, None],
+                Yp.flatten(order = order_style)[:, None],
+                Zp.flatten(order = order_style)[:, None]
             )), dtype=torch.float32)
 
             # J_y: (xmid[0], xpos[1], xmid[2])
             Xq, Yq, Zq = np.meshgrid(mesh.xmid[0], mesh.xpos[1], mesh.xmid[2], indexing='ij')
             xq_test = torch.tensor(np.hstack((
-                Xq.flatten()[:, None],
-                Yq.flatten()[:, None],
-                Zq.flatten()[:, None]
+                Xq.flatten(order = order_style)[:, None],
+                Yq.flatten(order = order_style)[:, None],
+                Zq.flatten(order = order_style)[:, None]
             )), dtype=torch.float32)
 
             # J_z: (xmid[0], xmid[1], xpos[2])
             Xr, Yr, Zr = np.meshgrid(mesh.xmid[0], mesh.xmid[1], mesh.xpos[2], indexing='ij')
             xr_test = torch.tensor(np.hstack((
-                Xr.flatten()[:, None],
-                Yr.flatten()[:, None],
-                Zr.flatten()[:, None]
+                Xr.flatten(order= order_style)[:, None],
+                Yr.flatten(order= order_style)[:, None],
+                Zr.flatten(order= order_style)[:, None]
             )), dtype=torch.float32)
 
             # Group together
             xc_test = [xp_test, xq_test, xr_test]
-        
-        
         return xc_test
         
     

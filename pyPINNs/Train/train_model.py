@@ -11,13 +11,13 @@ def clear_cuda():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-def evaluate_model(pde_model, data, normalization, ngroup):
+def evaluate_model(pde_model, data, normalization):
     if data.phi_test is not None:
         errors = []
-        phi_REL_L2, _, _, _, mass_phi_pred, mass_phi_test = pde_model.get_phi_test(data.X_test, data.phi_test, normalization, ngroup)
+        phi_REL_L2, _, _, _, mass_phi_pred, mass_phi_test = pde_model.get_phi_test(data.X_test, data.phi_test, normalization)
         errors.append(phi_REL_L2)
         if data.p_test is not None:
-            p_REL_L2 = pde_model.get_currents_test(data.Xc_test, data.p_test, normalization, mass_phi_pred, mass_phi_test, ngroup)[0]
+            p_REL_L2 = pde_model.get_currents_test(data.Xc_test, data.p_test, normalization, mass_phi_pred, mass_phi_test)[0]
             errors.append(p_REL_L2)
         return errors
     else:
@@ -40,6 +40,7 @@ def train(
     LossFile='Loss.dat',
     save_dir='',
     adaptive_loss=None,
+    attention_loss=None,
     model_regularizer=None,
     physics_regularizer=None,
     resampler = None,
@@ -48,7 +49,7 @@ def train(
 ):
     train_on_batch = kwargs.get('train_on_batch', False)
     normalization = kwargs.get('normalization', False)
-    num_groups = kwargs.get('num_groups', None)
+    # num_groups = kwargs.get('num_groups', None)
     isLossData = kwargs.get('isLossData', False)
     save_model_always = kwargs.get('save_model_always', True)
 
@@ -81,23 +82,31 @@ def train(
 
     def closure():
         pde_model.optimizer.zero_grad()
-        loss_f = pde_model.loss_PDE(X_train)
-        loss_bc = pde_model.loss_BC(X_bc)
 
         if adaptive_loss is not None:
+            loss_f = pde_model.loss_PDE(X_train)
+            loss_bc = pde_model.loss_BC(X_bc)
             loss_physics = adaptive_loss([loss_f, loss_bc], model=pde_model.model)
+        elif attention_loss is not None:
+            loss_f = attention_loss(pde_model.residual_PDE(X_train))
+            loss_bc = pde_model.loss_BC(X_bc)
+            loss_physics = loss_f + loss_bc
         else:
+            loss_f = pde_model.loss_PDE(X_train)
+            loss_bc = pde_model.loss_BC(X_bc)
             loss_physics = loss_f + loss_bc
 
         # Regularization losses
         loss = loss_physics
+
         if model_regularizer is not None:
             loss += model_regularizer.compute(pde_model.model)
 
         if physics_regularizer is not None:
-            loss += physics_regularizer.compute(
+            loss_reg= physics_regularizer.compute(
                 pde_model, X_train=X_train, X_interface=X_interface, data=data
             )
+            loss = loss + loss_reg
 
         loss.backward(retain_graph=True)
 
@@ -105,11 +114,13 @@ def train(
         closure.loss_bc = loss_bc
         return loss
     
+    # torch.autograd.set_detect_anomaly(True)  # Enable for debugging (optional)
 
     for it in tqdm(range(n_step)):
         # Call dataloader
         if train_on_batch:
             for _, (X_train, X_bc) in enumerate(zip(data.data_collocation, data.data_boundary)):
+
                 loss = pde_model.optimizer.step(closure=closure)
                 # loss = pde_model.optimizer.step(lambda: closure(X_train, X_bc, X_interface))
                 clear_cuda()
@@ -117,19 +128,32 @@ def train(
         else: # train on full data set
             X_train, X_bc = data.X_train, data.X_bc
             X_interface = data.X_interface
+
+            # # Update attention MLP 
+            # if attention_loss is not None:
+            #     residuals = pde_model.residual_PDE(X_train)
+            #     attention_loss.update_attention(residuals)
+
             loss = pde_model.optimizer.step(closure=closure)
             # loss = pde_model.optimizer.step(lambda: closure(X_train, X_bc, X_interface))
+
+
+            # Update attention MLP 
+            if attention_loss is not None:
+                # residuals = pde_model.residual_PDE(X_train)
+                residuals = pde_model.residual_PDE(X_train).detach()
+                attention_loss.update_attention(residuals)
+                # attention_loss.log_weights()
+
             clear_cuda()
 
         if pde_model.scheduler is not None:
             pde_model.scheduler.step()
 
-        # loss_bc = closure.loss_bc
-        # loss_f  = closure.loss_f
 
         if pde_model.iter % log_every == 0 or pde_model.iter == 1:
             losses = [pde_model.iter,loss.item(), closure.loss_bc.item(), closure.loss_f.item()]
-            output_errors = evaluate_model(pde_model, data, normalization, num_groups)
+            output_errors = evaluate_model(pde_model, data, normalization)
             if output_errors is not None:
                 errors =  [err.item()  for err in output_errors]
                 if  errors[0] < pde_model.best_test: # the first important error: flux error
@@ -138,7 +162,7 @@ def train(
             else:
                 errors = None
             
-             # Log using Logger
+            # Log using Logger
             logger.log(losses, errors if errors else None)
 
         # Save best model
@@ -149,11 +173,15 @@ def train(
         # Resampling
         if resampler is not None and resampler.should_resample(pde_model.iter):
             resampler.apply(pde_model.iter)
+            pde_model.update_cross_sections(data.X_train)
+
+
 
         if getattr(pde_model, "do_outer", False) and getattr(pde_model, "N_inner", 0) > 0:
             if pde_model.iter % pde_model.N_inner == 0:
                 if hasattr(pde_model, "update_source"):
                     pde_model.update_source(data.X_train)
+                    # attention_loss.log_weights()
     
         pde_model.iter += 1
         if getattr(pde_model, "stopping", False):

@@ -17,6 +17,7 @@ class XsContainer:
         self.sigma_r = torch.zeros((self.M, self.G), dtype=torch.float32,device=device)
         self.sigma_s = torch.zeros((self.M, self.G, self.G), dtype=torch.float32,device=device)
         self.fission_spectrum = torch.ones(self.G, dtype=torch.float32,device=device)
+        self.Sf = torch.zeros((self.M, self.G), dtype=torch.float32,device=device)
         self.device = device
 
 
@@ -50,14 +51,22 @@ class XsContainer:
             self.uns3d[material_idx, group_idx] = values.item() if len(values) == 1 else values[group_idx]
 
     def setNuSigf(self, nuSigf_list, group_idx, material_idx=None):
-      
+
         values = torch.tensor(nuSigf_list, dtype=torch.float32,device=self.device)
         if material_idx is None:
             assert len(values) == self.M, "Length mismatch with number of materials"
             self.nusigma_f[:, group_idx] = values
         else:
             self.nusigma_f[material_idx, group_idx] = values.item() if len(values) == 1 else values[group_idx]
+    def setSource(self, source_list, group_idx, material_idx=None):
 
+        values = torch.tensor(source_list, dtype=torch.float32,device=self.device)
+        if material_idx is None:
+            assert len(values) == self.M, "Length mismatch with number of materials"
+            self.Sf[:, group_idx] = values
+        else:
+            self.Sf[material_idx, group_idx] = values.item() if len(values) == 1 else values[group_idx]
+            
     def setRemoval(self, removal_list, group_idx, material_idx=None):
         values = torch.tensor(removal_list, dtype=torch.float32,device=self.device)
         if material_idx is None:
@@ -65,8 +74,7 @@ class XsContainer:
             self.sigma_r[:, group_idx] = values
         else:
             self.sigma_r[material_idx, group_idx] = values.item() if len(values) == 1 else values[group_idx]
-       
-       
+
 
     def setScattering(self, scatter_list, g_to, g_from, material_idx=None):
         """
@@ -124,6 +132,13 @@ class XsContainer:
         if self.nusigma_f is None:
             raise ValueError("nuFission cross section not provided.")
         return self.nusigma_f[material_ids]
+    
+    def get_source(self, material_ids):
+        # returns fission cross section (N, G)
+        if self.Sf is None:
+            raise ValueError("Source cross section not provided.")
+        return self.Sf[material_ids]
+    
     def get_fission_spectrum(self):
         return self.fission_spectrum
 
@@ -168,6 +183,13 @@ class XsEvaluator:
         idx = tuple(cell_indices[:, i] for i in range(cell_indices.shape[1]))
         material_ids = self.geometry.material_map[idx]
         return self.xs.get_nusigma_f(material_ids)
+    
+    def source(self, points):
+        cell_indices = self.geometry.find_cells(points)
+        idx = tuple(cell_indices[:, i] for i in range(cell_indices.shape[1]))
+        material_ids = self.geometry.material_map[idx]
+        return self.xs.get_source(material_ids)
+    
     def fission_spectrum(self):
         return self.xs.get_fission_spectrum()
 
