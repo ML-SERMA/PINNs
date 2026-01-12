@@ -67,7 +67,13 @@ class mixed_multigroup_diffusion_source(mixed_multigroup_diffusion):
 
         # Compute gradient constraints: 1/D * p_g + ∇phi_g
         grad_constraints = torch.stack([(p[:, g, :] / self.D[:, g:g+1]) + operator.grad(phi[:, g:g+1], X) for g in range(self.G)], dim=1)  # [N, G, d]
-        residuals = torch.cat([flux_constrain, grad_constraints], dim=-1)  # [N, G, 1+d]
+
+        # scale the residuals
+        dTe_inv_sqrt = 1.0 / torch.sqrt(self.Sigma_r + 1e-12)   # [N, G]
+        flux_constrain_scaled = flux_constrain * dTe_inv_sqrt.unsqueeze(-1)  # [N, G, 1]
+        grad_constraints_scaled = grad_constraints * torch.sqrt(self.D + 1e-12).unsqueeze(-1)
+
+        residuals = torch.cat([flux_constrain_scaled, grad_constraints_scaled], dim=-1)  # [N, G, 1+d]
 
 
         # # Reconstruct total cross section: Σ_t = Σ_r + Σ_s[g→g]

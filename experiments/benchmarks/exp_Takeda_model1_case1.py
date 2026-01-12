@@ -29,8 +29,8 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Takeda_model1_case1_SLR1e-3_Nit40000')
-parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=200*1024)
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Takeda_model1_case1_SLR1e-3_0.96_20000_Nit2000')
+parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=400*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[50,50,50])
 parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=8000000)
@@ -71,8 +71,8 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
                 'fourier_mapping_size':None,'hard_BC':'Takeda1'}
 
 params_solver = {'momentum':False,'beta1':0.0,'beta2':0.8,
-                'num_inner_iters':40000, 'keff_ref':0.92818,'verbose':2, 'save_dir':save_dir, 'keff_method':'scaled_rayleigh',
-                'anderson':False,'beta':0.8,'m':4} 
+                'num_inner_iters':2000, 'keff_ref':0.92834,'verbose':2, 'save_dir':save_dir, 'keff_method':'scaled_rayleigh',
+                'anderson':False,'beta':0.8,'m':4} # old keff= 0.92818
 
 
 
@@ -198,7 +198,8 @@ mypde = mixed_multigroup_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,par
 #Adam
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.98)
+# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.95)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.96)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
 # LBFGS
@@ -213,7 +214,7 @@ mypde.compile(optimizer=optimizer,scheduler=scheduler)
 # load model before train
 # mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
 
-train(mypde,pdeData,**params_train,adaptive_loss=None,resampler=None)
+train(mypde,pdeData,**params_train)
 
 
 

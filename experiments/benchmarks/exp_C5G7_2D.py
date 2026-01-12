@@ -30,7 +30,7 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_2G_C5G7_SLR1e-3_095_Nit4000_HBC')
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_2G_C5G7_SLR1e-3_09_Nit2000_HBC')
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=20*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[120,120])
@@ -70,7 +70,7 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
                 'fourier_mapping_size':None,'hard_BC':'2G_C5G7'}
 
 params_solver = {'momentum':False,'beta1':0.0,'beta2':0.6,
-                'num_inner_iters':4000, 'keff_ref':0.927572,'verbose':2, 'save_dir':save_dir,
+                'num_inner_iters':2000, 'keff_ref':0.92757,'verbose':2, 'save_dir':save_dir,
                 'anderson':False,'beta':0.8,'m':4}
 
 
@@ -302,13 +302,14 @@ print('model',model_fcn)
 # Training Time
 mypde = mixed_multigroup_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.9)
+# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.9)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
-# esampler = Resampler(mypde,pdeData,save_dir=save_dir,interval=1e5,min_iter=1e5,max_iter=1e6,method='EVO')
-# RA_loss = ResidualAttention(lr=1e-2, temperature=1.0, mode="all")
+# resampler = Resampler(mypde,pdeData,save_dir=save_dir,interval=1e5,min_iter=1e5,max_iter=1e6,method='EVO')
 
+
+# RA_loss = ResidualAttention(lr=1e-2, temperature=1.0, mode="all")
 #RAN_loss = ResidualAttentionMLP(hidden_dim=32,lr=0.01).to(device)
 
 # load model before train
@@ -316,7 +317,7 @@ mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
 AttentionLoss = ResidualWeightingAttention(shape=(args.n_collocation,2,3),learn_rate=0.2, init="ones", normalize=None,device=device)
 
-# train(mypde,pdeData,**params_train,attention_loss=None)
+train(mypde,pdeData,**params_train,attention_loss=None)
 
 
 # # continue to train with LBFGS

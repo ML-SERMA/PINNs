@@ -11,8 +11,9 @@ sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
 from pyPINNs.PDE.mixed_multigroup_diffusion_source import mixed_multigroup_diffusion_source
-from pyPINNs.Mesh.CartesianMesh import CartesianMesh
+from pyPINNs.Geometry.CartesianGeometry import CartesianGeometry
 from pyPINNs.Tools.visualization import visualization
+from pyPINNs.Tools.resampler import Resampler
 from pyPINNs.Tools.basic_utils import check_create_dir
 from pyPINNs.Model.neuron_network.FCN import FCN, FCN_FF
 from pyPINNs.Data.DataSet import DataSet
@@ -25,8 +26,8 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='Mixed_FCN_2G_C5G7_SLR1e-3_4000_095_HBC')
-parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=20*1024)
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EVO_iv6e4_Scaled_Mixed_FCN_2G_C5G7S_SLR1e-3_4000_095_HBC')
+parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=10*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[120,120])
 parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=500000)
@@ -65,64 +66,7 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
 
 
 
-# def func_D1(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
 
-#     D = 1.2*torch.ones_like(x) # Material 3
-#     # D[((x>=0)&(x<=21.42)&(y>=0)&(y<=21.42))+((x>=21.42)&(x<=42.84)&(y>=21.42)&(y<=42.84))] = 1.2 # Material 1
-#     # D[((x>=21.42)&(x<=42.84)&(y>=0)&(y<=21.42))+ ((x>=0)&(x<=21.41)&(y>=21.42)&(y<=42.84)) ] = 1.2 # Material 2
-#     return D
-# def func_D2(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
-
-#     D = 0.2*torch.ones_like(x) # Material 3
-#     D[((x>=0)&(x<=21.42)&(y>=0)&(y<=21.42))+((x>=21.42)&(x<=42.84)&(y>=21.42)&(y<=42.84))] = 0.4 # Material 1
-#     D[((x>=21.42)&(x<=42.84)&(y>=0)&(y<=21.42))+ ((x>=0)&(x<=21.41)&(y>=21.42)&(y<=42.84)) ] = 0.4 # Material 2
-#     return D
-
-# def func_Sigma_a1(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
-#     Sigma_a = 0.001*torch.ones_like(x)
-#     Sigma_a[((x>=0)&(x<=21.42)&(y>=0)&(y<=21.42))+((x>=21.42)&(x<=42.84)&(y>=21.42)&(y<=42.84))] = 0.015 # Material 1
-#     Sigma_a[((x>=21.42)&(x<=42.84)&(y>=0)&(y<=21.42))+ ((x>=0)&(x<=21.41)&(y>=21.42)&(y<=42.84)) ] = 0.015 # Material 2
-#     return Sigma_a
-
-# def func_Sigma_a2(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
-#     Sigma_a = 0.04*torch.ones_like(x)
-#     Sigma_a[((x>=0)&(x<=21.42)&(y>=0)&(y<=21.42))+((x>=21.42)&(x<=42.84)&(y>=21.42)&(y<=42.84))] = 0.3 # Material 1
-#     Sigma_a[((x>=21.42)&(x<=42.84)&(y>=0)&(y<=21.42))+ ((x>=0)&(x<=21.41)&(y>=21.42)&(y<=42.84)) ] = 0.25 # Material 2
-#     return Sigma_a
-
-# def func_Sigma_s12(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
-#     Sigma_s = 0.05*torch.ones_like(x)
-#     Sigma_s[((x>=0)&(x<=21.42)&(y>=0)&(y<=21.42))+((x>=21.42)&(x<=42.84)&(y>=21.42)&(y<=42.84))] = 0.015 # Material 1
-#     Sigma_s[((x>=21.42)&(x<=42.84)&(y>=0)&(y<=21.42))+ ((x>=0)&(x<=21.41)&(y>=21.42)&(y<=42.84)) ] = 0.015 # Material 2
-#     return Sigma_s
-
-
-# def func_S1(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
-#     # R5 
-#     S = torch.zeros_like(x)
-#     # R1
-#     S[((x>=0)&(x<=21.42)&(y>=0)&(y<=21.42))+((x>=21.42)&(x<=42.84)&(y>=21.42)&(y<=42.84))] = 0.0075 #0.45 # Material 1
-#     S[((x>=21.42)&(x<=42.84)&(y>=0)&(y<=21.42))+ ((x>=0)&(x<=21.41)&(y>=21.42)&(y<=42.84)) ] = 0.0075  #0.375 # Material 2
-#     return S
-
-# def func_S2(X):
-#     x=X[:,0:1]
-#     y=X[:,1:2]
-#     # R5 
-#     S = torch.zeros_like(x)
-#     return S
 ##===========================================================================================================================
 
 
@@ -220,7 +164,7 @@ def func_Sigma_s(X):
     return Sigma_s  # shape (N, G, G)
 
 
-def func_S(X):
+def func_Sf(X):
     x = X[:, 0:1]
     y = X[:, 1:2]
 
@@ -243,7 +187,7 @@ def func_S(X):
     # Group 2 source remains 0 (as in func_S2)
     return S  # shape [N, 2]
 
-params_pde = {'func_D':func_D,'func_Sigma_r':func_Sigma_r,'func_Sigma_s':func_Sigma_s,'func_S':func_S, 'num_groups':2}
+params_pde = {'func_D':func_D,'func_Sigma_r':func_Sigma_r,'func_Sigma_s':func_Sigma_s,'func_Sf':func_Sf, 'num_groups':2}
 
 pdeDomain = SquareDomain(**params_domain)
 pdeData = DataSet(domain=pdeDomain,**params_data)
@@ -259,7 +203,7 @@ visualization.viewCrossSection(pdeData.X_train,func_D(pdeData.X_train)[:,1],path
 visualization.viewCrossSection(pdeData.X_train,func_Sigma_r(pdeData.X_train)[:,0],pathFile=save_dir+'Sigma_r1.png')
 visualization.viewCrossSection(pdeData.X_train,func_Sigma_r(pdeData.X_train)[:,1],pathFile=save_dir+'Sigma_r2.png')
 visualization.viewCrossSection(pdeData.X_train,func_Sigma_s(pdeData.X_train)[:,1,0],pathFile=save_dir+'Sigma_s12.png')
-visualization.viewCrossSection(pdeData.X_train,func_S(pdeData.X_train)[:,0],pathFile=save_dir+'S1.png')
+visualization.viewCrossSection(pdeData.X_train,func_Sf(pdeData.X_train)[:,0],pathFile=save_dir+'S1.png')
 
 # input('Enter')
 
@@ -272,12 +216,11 @@ print('model',model_fcn)
 # Training Time
 mypde = mixed_multigroup_diffusion_source(pdeDomain,model_fcn,params_pde,device)
 
-# parameters = [*mypde.model.parameters(), *mypde.loss_function.parameters()]
-# optimizer = torch.optim.Adam(parameters, lr=1.e-3,weight_decay=0.0)
-
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4000, gamma=0.95)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
+
+resampler = Resampler(mypde,pdeData,save_dir=save_dir,interval=6e4,min_iter=4e4,max_iter=4e5,method='EVO')
 
 
 # residu_PDE = mypde.residual_PDE(pdeData.X_train)
@@ -292,7 +235,7 @@ mypde.compile(optimizer=optimizer,scheduler=scheduler)
 # print(f"==>> residu_PDE_2G: {residu_PDE_2G}")
 
 
-train(mypde,pdeData,**params_train)
+train(mypde,pdeData,**params_train, resampler=resampler)
 
 
 # Model Accuracy 
@@ -302,30 +245,28 @@ solution = mypde.full_predict(pdeData.X_test)
 
 phi_pred = [solution[:,0:1],solution[:,3:4]]
 
-ngroup =2
-for igroup in range(ngroup):
-    visualization.viewSolution(params_domain,[120,120],phi_pred[igroup],save_dir+'flux_group_'+str(igroup)+'.png')
-
+mesh = CartesianGeometry(ndim=2,xmin=params_domain['xmin'],xmax=params_domain['xmax'],num_cells=args.n_test)
+visualization.export_flux_list(mesh,phi_pred,filename= save_dir+'flux_data.vtr')
 visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
 
-phi_REL_L2, phi_AE, phi_pred, phi_test,_,_ = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False,ngroup=2)
 
+##======================================================================================================
+ngroup =2
 for igroup in range(ngroup):
-    minE = torch.min(phi_AE[igroup])
-    print(f"==>> minE: {minE}")
-    maxE =torch.max(phi_AE[igroup])
-    print(f"==>> maxE: {maxE}")
+    visualization.viewFlux(mesh,phi_pred[igroup],save_dir,'flux_group_'+str(igroup)+'.png',order='C')
 
-    minF = torch.min(torch.stack([torch.min(phi_pred[igroup]),torch.min(phi_test[igroup])]))
-    print(f"==>> minF: {minF}")
-    maxF = torch.max(torch.stack([torch.max(phi_pred[igroup]),torch.max(phi_test[igroup])]))
-    print(f"==>> maxF: {maxF}")
-    visualization.viewErrorAndSolutionScale(params_domain,[120,120],phi_AE[igroup],phi_pred[igroup],phi_test[igroup],save_dir,'error_phi_group_'+str(igroup)+'.png',vminE=minE,vmaxE=maxE,vminF=minF,vmaxF=maxF)
+show_flux = True
+if show_flux:
+    phi_REL_L2, phi_AE, phi_pred, phi_test, _, _ = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=False)
+    for igroup in range(ngroup):
+        visualization.viewErrorAndFlux(mesh,phi_AE[igroup],phi_pred[igroup],phi_test[igroup],
+                                        save_dir,'error_phi_group_'+str(igroup)+'.png',order='C')
 
-# Visualization currents
 show_currents = True
 if show_currents:
+    p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=False)
     for igroup in range(ngroup):
-        p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=False,ngroup=2)
-        visualization.viewErrorAndCurrents(params_domain,[120,120],p_AE[igroup],p_pred[igroup],p_test[igroup],
-                                            save_dir,'error_current_group_'+str(igroup)+'.png')
+        visualization.viewErrorAndCurrents(mesh,p_AE[igroup],p_pred[igroup],p_test[igroup],
+                                            save_dir,'error_current_group_'+str(igroup)+'.png',order='C')
+        
+

@@ -30,15 +30,15 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_2G_TWIGL_2D_SLR1e-3_09_Nit2000_HBC')
+parser.add_argument('-t','--test', type=str, help="name of test case",default='Scaled_EP_Mixed_FCN_2G_TWIGL_2D_SLR1e-3_09_Nit2000_HBC')
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=20*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[120,120])
 parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=2000000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[2]+5*[64]+[6])
-parser.add_argument('-a','--activation', type=str, help="activation function",default='Sin')
-parser.add_argument('-s','--sampling', type=str, help="sampling method",default='Sobol')
+parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
+parser.add_argument('-s','--sampling', type=str, help="sampling method",default='random')
 parser.add_argument('-v', '--verbose',action='count', default=0)  
 
 args = parser.parse_args()
@@ -70,7 +70,7 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
                 'fourier_mapping_size':None,'hard_BC':'TWIGL_2D'}
 
 params_solver = {'momentum':False,'beta1':0.0,'beta2':0.6,
-                'num_inner_iters':2000, 'keff_ref':0.91307,'verbose':2, 'save_dir':save_dir,
+                'num_inner_iters':2000, 'keff_ref':0.91320,'verbose':2, 'save_dir':save_dir,
                 'anderson':False,'beta':0.8,'m':4}
 
 

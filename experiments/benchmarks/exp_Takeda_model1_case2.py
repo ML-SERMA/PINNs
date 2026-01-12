@@ -28,13 +28,13 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Takeda_model1_case2_SLR1e-3_Nit2000')
-parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=100*1024)
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_Takeda_model1_case2_SLR1e-3_0.96_20000_Nit8000_AA_beta0.5_m4')
+parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=300*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[50,50,50])
-parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=4000000)
+parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=8000000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
-parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[3]+5*[64]+[8])
+parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[3]+7*[64]+[8])
 parser.add_argument('-a','--activation', type=str, help="activation function",default='Sin')
 parser.add_argument('-s','--sampling', type=str, help="sampling method",default='Sobol')
 parser.add_argument('-v', '--verbose',action='count', default=0)  
@@ -70,8 +70,8 @@ params_model = {'layers':args.n_neuron,'activation':args.activation,'device':dev
                 'fourier_mapping_size':None,'hard_BC':'Takeda1'}
 
 params_solver = {'momentum':False,'beta1':0.0,'beta2':0.8,
-                'num_inner_iters':2000, 'keff_ref':0.93198,'verbose':2, 'save_dir':save_dir,
-                'anderson':False,'beta':0.8,'m':4} # 0.93113
+                'num_inner_iters':8000, 'keff_ref':0.93214,'verbose':2, 'save_dir':save_dir,
+                'anderson':True,'beta':0.5,'m':4} # old value: 0.93198
 
 
 
@@ -194,11 +194,11 @@ print('model',model_fcn)
 # Training Time
 mypde = mixed_multigroup_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.96)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
 
-# train(mypde,pdeData,**params_train)
+train(mypde,pdeData,**params_train)
 
 
 
@@ -218,13 +218,7 @@ ngroup =2
 for igroup in range(ngroup):
     visualization.viewFlux(mesh,phi_pred[igroup],save_dir,'flux_group_'+str(igroup)+'.png',order='F')
     
-    visualization.viewFlux3D_volume(mesh, phi_pred[igroup], order='F', mode='volume')
-
-
-
-
-
-
+    # visualization.viewFlux3D_volume(mesh, phi_pred[igroup], order='F', mode='volume')
 
 
 
@@ -245,6 +239,12 @@ if show_currents:
                                                 save_dir,'error_current_group_'+str(igroup)+'.png',order='F')
         
 visualization.show_history_residuals(pathFile=save_dir+'train.csv',save_dir=save_dir,keff_ref_exist=True)
+
+visualization.export_flux_list(mesh,phi_test,filename= save_dir+'phi_test.vtr')
+visualization.export_flux_list(mesh,phi_AE,filename= save_dir+'phi_AE.vtr')
+
+
+
 
 
 

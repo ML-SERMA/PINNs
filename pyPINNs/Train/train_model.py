@@ -173,7 +173,7 @@ def train(
         # Resampling
         if resampler is not None and resampler.should_resample(pde_model.iter):
             resampler.apply(pde_model.iter)
-            pde_model.update_cross_sections(data.X_train)
+            pde_model.get_cross_sections(data.X_train)
 
 
 
