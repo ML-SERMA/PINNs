@@ -30,7 +30,7 @@ print(f"==>> results_dir: {results_dir}")
 print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
-parser.add_argument('-t','--test', type=str, help="name of test case",default='Scaled_EP_Mixed_FCN_2G_TWIGL_2D_SLR1e-3_09_Nit2000_HBC')
+parser.add_argument('-t','--test', type=str, help="name of test case",default='EP_Mixed_FCN_2G_TWIGL_2D_SLR2e-4_09_Nit2000_HBC')
 parser.add_argument('-nc','--n_collocation', type=int, help="an integer number",default=20*1024)
 parser.add_argument('-nb','--n_boundary', type=int, help="an integer number",default=512)
 parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer number",default=[120,120])
@@ -39,19 +39,24 @@ parser.add_argument('-log','--log_every', type=int, help="an integer number",def
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[2]+5*[64]+[6])
 parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
 parser.add_argument('-s','--sampling', type=str, help="sampling method",default='random')
-parser.add_argument('-v', '--verbose',action='count', default=0)  
+parser.add_argument('-v', '--verbose',action='count', default=0) 
+parser.add_argument("--scaling-loss",dest="scaling_loss",action="store_true",default=True,help="Enable loss scaling")
+parser.add_argument("--no-scaling-loss",dest="scaling_loss",action="store_false",help="Disable loss scaling")
+
 
 args = parser.parse_args()
-
+scaling_tag = "Scaled" if args.scaling_loss else "Unscaled"
 name_folder = args.test + '_nc' + str(args.n_collocation) + '_nb' + str(args.n_boundary) \
-                + '_nt' + str(args.n_test) + '_ns' + str(args.n_step) + '_nn' + str(args.n_neuron)+'_'+str(args.activation)+'_'+str(args.sampling)
+                + '_nt' + str(args.n_test) + '_ns' + str(args.n_step) + '_nn' + str(args.n_neuron)\
+                +'_'+str(args.activation)+'_'+str(args.sampling) + "_" + scaling_tag
+                
 save_dir = check_create_dir(results_dir+name_folder+'/')
 print(f"==>> save_dir: {name_folder}")
 
 # Check if we run on GPU
 if torch.cuda.is_available():
     device = torch.device('cuda')
-    torch.cuda.set_device(0)
+    torch.cuda.set_device(1)
 else:
     device = torch.device('cpu')
 print(f"Running on {device}. Yes! ")
@@ -61,7 +66,7 @@ print(f"Running on {device}. Yes! ")
 params_domain = {'xmin':[0, 0], 'xmax':[80, 80],'boundary_conditions': [['REFLECTION', 'ZERO_FLUX'],['REFLECTION', 'ZERO_FLUX']],
                 'type_of_points':args.sampling}
 params_data = {'n_collocation':args.n_collocation,'n_boundary':args.n_boundary,'n_test':args.n_test,
-                'random_seed':2024,'device':device}
+                'random_seed':1234,'device':device}
 
 params_train = {'n_step':args.n_step,'verbose':args.verbose,'log_every':args.log_every,'LossFile':'Loss.csv','save_dir':save_dir,
                 'num_groups':2,'normalization':True}
@@ -69,7 +74,8 @@ params_train = {'n_step':args.n_step,'verbose':args.verbose,'log_every':args.log
 params_model = {'layers':args.n_neuron,'activation':args.activation,'device':device,
                 'fourier_mapping_size':None,'hard_BC':'TWIGL_2D'}
 
-params_solver = {'momentum':False,'beta1':0.0,'beta2':0.6,
+params_solver = {'scaling_loss':args.scaling_loss,
+                'momentum':False,'beta1':0.0,'beta2':0.6,
                 'num_inner_iters':2000, 'keff_ref':0.91320,'verbose':2, 'save_dir':save_dir,
                 'anderson':False,'beta':0.8,'m':4}
 
@@ -175,8 +181,7 @@ print('model',model_fcn)
 
 # Training Time
 mypde = mixed_multigroup_diffusion_eigenvalue(pdeDomain,model_fcn,params_pde,params_solver,device)
-optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
-# scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.95)
+optimizer = torch.optim.Adam(mypde.model.parameters(), lr=2.e-4,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.9)
 mypde.compile(optimizer=optimizer,scheduler=scheduler)
 
@@ -188,7 +193,7 @@ mypde.compile(optimizer=optimizer,scheduler=scheduler)
 # load model before train
 # mypde.model.load_state_dict(torch.load(save_dir+"model.pt"))
 
-AttentionLoss = ResidualWeightingAttention(shape=(args.n_collocation,2,3),learn_rate=0.2, init="ones", normalize=None,device=device)
+# AttentionLoss = ResidualWeightingAttention(shape=(args.n_collocation,2,3),learn_rate=0.2, init="ones", normalize=None,device=device)
 
 train(mypde,pdeData,**params_train,attention_loss=None)
 
@@ -214,27 +219,28 @@ phi_pred= mypde.unpack_solution(solution)[0]
 mesh = CartesianGeometry(ndim=2,xmin=params_domain['xmin'],xmax=params_domain['xmax'],num_cells=args.n_test)
 visualization.export_flux_list(mesh,phi_pred,filename= save_dir+'flux_data.vtr')
 
-visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
+# visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
+visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,n_phi_groups=ngroup,n_p_groups=ngroup)
 
 for igroup in range(ngroup):
-    visualization.viewFlux(mesh,phi_pred[igroup],save_dir,'flux_group_'+str(igroup)+'.png',order='C')
+    visualization.viewFlux(mesh,phi_pred[igroup],save_dir,'flux_group_'+str(igroup)+'.png',index='xy')
 
 
 
 show_flux = True
 if show_flux:
-    phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)
+    phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test = mypde.get_phi_test(pdeData.X_test,pdeData.phi_test,normalization=True)[2:]
     for igroup in range(ngroup):
         visualization.viewErrorAndFlux(mesh,phi_AE[igroup],phi_pred[igroup],phi_test[igroup],
-                                        save_dir,'error_phi_group_'+str(igroup)+'.png',order='C')
+                                        save_dir,'error_phi_group_'+str(igroup)+'.png',index='xy')
 
 show_currents = True
 if show_currents:
-    p_REL_L2 ,p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,
-                                                                mass_pred=mass_phi_pred,mass_test=mass_phi_test)
+    p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,
+                                                                mass_pred=mass_phi_pred,mass_test=mass_phi_test)[2:]
     for igroup in range(ngroup):
         visualization.viewErrorAndCurrents(mesh,p_AE[igroup],p_pred[igroup],p_test[igroup],
-                                            save_dir,'error_current_group_'+str(igroup)+'.png',order='C')
+                                            save_dir,'error_current_group_'+str(igroup)+'.png',index='xy')
         
 visualization.show_history_residuals(pathFile=save_dir+'train.csv',save_dir=save_dir,keff_ref_exist=True)
 

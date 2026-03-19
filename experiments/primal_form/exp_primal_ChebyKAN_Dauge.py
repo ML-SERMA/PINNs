@@ -11,7 +11,7 @@ sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
 # from pyPINNs.PDE.mixed_one_group_diffusion_source import mixed_one_group_diffusion_source
-from pyPINNs.PDE.primal_one_group_diffusion_source import primal_one_group_diffusion_source
+from pyPINNs.PDE_dev.primal_one_group_diffusion_source import primal_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir

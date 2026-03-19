@@ -24,7 +24,8 @@ class mixed_one_group_diffusion_source(pdeBase):
 
         eq_c = 1.0/D*p + operator.grad(phi,X)
         eq_f = operator.div(p,X)+ sigma_a*phi -s
-        eq = torch.hstack((eq_c,eq_f))
+        # eq = torch.hstack((eq_c,eq_f))
+        eq = torch.hstack((eq_f,eq_c))
         # tout=time.time()
         # print("Elapsed: ",tout-tin," seconds")
         return eq

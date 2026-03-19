@@ -24,6 +24,7 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         self.params_solver = params_solver
         self.device = device
         self.initialized = False
+        self.scaling_loss = params_solver.get('scaling_loss',True)
         
 
     def _initialize(self,N):
@@ -34,13 +35,6 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         self.stopping = False
 
         self.phi =  torch.ones(N, self.G, device=self.device)  # [N, G]
-
-
-        # self.Sgr = self.chi.view(1,-1)*torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, G]
-        # self.prevSgr = self.chi.view(1,-1)*torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, G]
-        # self.Xh = torch.ones(N, self.G, device=self.device).view(-1,1)  # [N*G,1]
-        # self.Fh = torch.ones(N, self.G, device=self.device).view(-1,1)  # [N*G,1]
-
         self.Sgr = torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, 1]
         self.prevSgr = torch.sum(self.NuSigma_f*self.phi,dim=1, keepdim=True)  # [N, 1]
         self.Xh = torch.ones(N, 1, device=self.device) # [N,1]
@@ -55,7 +49,7 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         self.momentum = self.params_solver.get('momentum', False)
         self.verbose = self.params_solver.get('verbose', 0)
         self.keff_method = self.params_solver.get('keff_method','scaled_rayleigh')
-        print(f"==>> keff_method: {self.keff_method}")
+
         # beta params for momentum
         self.beta1 = self.params_solver.get('beta1', 0.0)
         self.beta2 = self.params_solver.get('beta2', 0.0)
@@ -141,16 +135,13 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         # Compute gradient constraints: 1/D * p_g + ∇phi_g
         grad_constraints = torch.stack([(p[:, g, :] / self.D[:, g:g+1]) + operator.grad(phi[:, g:g+1], X) for g in range(self.G)], dim=1)  # [N, G, d]
         
-        # scale the residuals
-        dTe_inv_sqrt = 1.0 / torch.sqrt(self.Sigma_r + 1e-12)   # [N, G]
-        flux_constrain_scaled = flux_constrain * dTe_inv_sqrt.unsqueeze(-1)  # [N, G, 1]
-        grad_constraints_scaled = grad_constraints * torch.sqrt(self.D + 1e-12).unsqueeze(-1)
-        
-        # D_sqrt = torch.sqrt(self.D + 1e-12)   # [N, G]
-        # grad_scaled = torch.stack([(p[:, g, :] / D_sqrt[:, g:g+1]) + D_sqrt[:, g:g+1] * operator.grad(phi[:, g:g+1], X) for g in range(self.G)], dim=1)   # [N, G, d]
-
-        residuals = torch.cat([flux_constrain_scaled, grad_constraints_scaled], dim=-1)  # [N, G, 1+d]
-
+        if self.scaling_loss:
+            dTe_inv_sqrt = 1.0 / torch.sqrt(self.Sigma_r + 1e-12)   # [N, G]
+            flux_constrain_scaled = flux_constrain * dTe_inv_sqrt.unsqueeze(-1)  # [N, G, 1]
+            grad_constraints_scaled = grad_constraints * torch.sqrt(self.D + 1e-12).unsqueeze(-1)
+            residuals = torch.cat([flux_constrain_scaled, grad_constraints_scaled], dim=-1)  # [N, G, 1+d]
+        else:
+            residuals = torch.cat([flux_constrain, grad_constraints], dim=-1)  # [N, G, 1+d]
 
         self.it = self.it + 1
         # stop algorithm 
@@ -183,8 +174,12 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
                 alpha = self.solve_minimize_residual(Sgr, m=self.m_anderson)
                 self.Xh = torch.hstack([self.Xh[:, -self.m_anderson:], self.Sgr.view(-1,1)])
                 self.Fh = torch.hstack([self.Fh[:, -self.m_anderson:], Sgr.view(-1,1)])
-                S_temp = (1 - self.beta_anderson) * (self.Xh @ alpha) + self.beta_anderson * (self.Fh @ alpha)
-                S_updated = S_temp.view(-1,1)# (N,1)
+                if self.ite <=5:
+                    print("Skip some first iterations for Anderson method !")
+                    S_updated = Sgr.detach().clone()
+                else:
+                    S_temp = (1 - self.beta_anderson) * (self.Xh @ alpha) + self.beta_anderson * (self.Fh @ alpha)
+                    S_updated = S_temp.view(-1,1)# (N,1)
         else:
             S_updated = Sgr.detach().clone()
 
@@ -228,7 +223,6 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
             denominator = torch.sum(S * S_old)
             keff = numerator / (denominator + 1e-12)
         elif self.keff_method == "projection":  
-            # least squares method
             numerator = torch.sum(S * S_old)
             denominator = torch.sum(S_old * S_old)
             keff = numerator / (denominator + 1e-12)
@@ -244,14 +238,13 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
             keff = torch.sqrt(numerator / (denominator + 1e-12))
             
         elif self.keff_method == "reaction_rate":
-            # 0.527
+
             # Let us note that torch.sum(S) == torch.sum(self.NuSigma_f * phi)
             # production = torch.sum(self.NuSigma_f * phi)
             production = torch.sum(S) 
             absorption = torch.sum(self.Sigma_r * phi)
             J = torch.stack(J_list, dim=1)        # [N, G, d]
             divJ = torch.stack([operator.div(J[:, g, :], X) for g in range(self.G)], dim=1)  # [N, G, 1]
-            # leakage = divJ.sum()
             leakage = -torch.sum(divJ)  # negative because ∇·J = -leakage
             keff = production / (absorption + leakage + 1e-12)
             
@@ -268,7 +261,6 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
         
         elif self.keff_method == "direct_normalization":
             # --- Numerator: (χ ⋅ φ)(νΣf ⋅ φ) ---
-
             # chi_phi = (self.chi * phi).sum(dim=1)            # [N]
             # nu_fiss_phi = (self.NuSigma_f * phi).sum(dim=1)  # [N]
             # numerator = torch.sum(chi_phi * nu_fiss_phi)         # scalar
@@ -285,7 +277,6 @@ class mixed_multigroup_diffusion_eigenvalue(mixed_multigroup_diffusion):
             numerator = torch.sum(S*S)
 
             # --- Denominator: inner product of S and residual ---
-            # 
             # p = torch.stack(J_list, dim=1)                           # [N, G, d]
             # zeta = torch.cat([phi.unsqueeze(-1), p], dim=2)          # [N, G, 1 + d]
 

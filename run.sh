@@ -22,5 +22,5 @@ export MKL_NUM_THREADS=4      # Same for Intel MKL (if used)
 echo "Checking GPU availability..."
 python3 -c "import torch; print('CUDA:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0))"
 
-python3 -m experiments.benchmarks.exp_Takeda_model1_case2
+python3 -m benchmarks.multi_group.exp_TWIGL_2D --no-scaling-loss
 exit 0

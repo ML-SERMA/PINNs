@@ -9,7 +9,8 @@ REMOTE_HOST="md256895@orcuslogin1"
 FOLDERS=(
     "data"
     "datagenerators"
-    "experiments"  
+    "experiments" 
+    "benchmarks" 
     "pyPINNs"
 )
 

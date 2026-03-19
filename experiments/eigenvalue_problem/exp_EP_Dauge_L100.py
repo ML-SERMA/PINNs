@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.mixed_one_group_diffusion_eigenvalue import mixed_one_group_diffusion_eigenvalue
+from pyPINNs.PDE_dev.mixed_one_group_diffusion_eigenvalue import mixed_one_group_diffusion_eigenvalue
 from pyPINNs.PDE.mixed_multigroup_diffusion_eigenvalue import mixed_multigroup_diffusion_eigenvalue
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
@@ -19,7 +19,7 @@ from pyPINNs.Tools.basic_utils import check_create_dir
 from pyPINNs.Model.neuron_network.FCN import FCN, FCN_FF
 from pyPINNs.Data.DataSet import DataSet
 # from pyPINNs.Train.train_model import train
-from pyPINNs.Train.train import train
+from pyPINNs.Train.train_model import train
 
 
 results_dir =  project_dir + '/results/'

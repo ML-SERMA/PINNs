@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.diffusion_one_group import diffusion_one_group
+from pyPINNs.PDE_dev.primal_one_group_diffusion_source import primal_one_group_diffusion_source
 
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
@@ -95,7 +95,7 @@ params_pde = {'func_D':model_D,'func_Sigma_a':func_Sigma_a,'func_Source':func_So
 
 model_fcn = FCN_FF(**params_model).to(device)
 # Training Time
-mypde = diffusion_one_group(pdeDomain,model_fcn,params_pde,device)
+mypde = primal_one_group_diffusion_source(pdeDomain,model_fcn,params_pde,device)
 
 summary(model_fcn, input_size=(2,))
 print('model',model_fcn)

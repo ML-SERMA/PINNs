@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.diffusion_one_group import diffusion_one_group
+from pyPINNs.PDE_dev.primal_one_group_diffusion_source import primal_one_group_diffusion_source
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir
@@ -98,7 +98,7 @@ print('model',model_fcn)
 input('Enter')
 
 # Training Time
-mypde = diffusion_one_group(pdeDomain,model_fcn,params_pde,device)
+mypde = primal_one_group_diffusion_source(pdeDomain,model_fcn,params_pde,device)
 
 optimizer = torch.optim.Adam(mypde.model.parameters(), lr=1.e-3,weight_decay=0.0)
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20000,40000,60000,80000,100000], gamma=0.5)

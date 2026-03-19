@@ -3,8 +3,7 @@ import numpy as np
 import time
 import seaborn as sns
 import matplotlib.pyplot as plt
-# from ..Domain.squareShape import generator_points
-# from ..Tools.visualization import visualization
+
 
 class pdeBase():
     def __init__(self,domain,model,device):
@@ -133,6 +132,10 @@ class pdeBase():
     def full_predict(self,X_test):
         pred = self.model.forward(X_test)
         return pred
+    def clear_cuda(self):
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
     
     # def phi_predict(self,X_test,ngroup=1):
     #     if ngroup ==1:
@@ -206,67 +209,65 @@ class pdeBase():
     
     
     
-    def adaptive_sampling(self,X,method='RAR-G'):
-        '''
-        method:
-                Residual based adaptive refinement with greedy (RAR-G)
-                Residual based adaptive distribution (RAD)
-                Residual based adaptive distribution with greedy (RAD-G)
-                Evolutionary sampling (EVO):
+    # def adaptive_sampling(self,X,method='RAR-G'):
+    #     '''
+    #     method:
+    #             Residual based adaptive refinement with greedy (RAR-G)
+    #             Residual based adaptive distribution (RAD)
+    #             Residual based adaptive distribution with greedy (RAD-G)
+    #             Evolutionary sampling (EVO):
 
-        '''
-        if method =='RAR':
-            # X_test = generator_points(n_samples=100,n_dim=2,random_seed=2024,type_of_points='random')
-            # X_test = X_test*(self.ub-self.lb) + self.lb
+    #     '''
+    #     if method =='RAR':
+    #         # X_test = generator_points(n_samples=100,n_dim=2,random_seed=2024,type_of_points='random')
+    #         # X_test = X_test*(self.ub-self.lb) + self.lb
 
-            X_test = self.domain.add_collocation_points(n_collocation=4000,random_seed=None)
-            X_test = X_test.requires_grad_().float().to(self.device)
-            residu = self.residual_PDE(X_test)
-            residu = torch.pow(residu,2).to(self.device)
-            residu = torch.sum(residu,1) # 1D tesnor
-            _, indices = torch.topk(residu,k=1024,dim=0,sorted=False)
-            X_new = X_test[indices]
-            X_new = X_new.clone().detach().requires_grad_(True)
-            X = torch.vstack((X,X_new))
-            print(f"==>> X-RAD: {X.shape}")
+    #         X_test = self.domain.add_collocation_points(n_collocation=4000,random_seed=None)
+    #         X_test = X_test.requires_grad_().float().to(self.device)
+    #         residu = self.residual_PDE(X_test)
+    #         residu = torch.pow(residu,2).to(self.device)
+    #         residu = torch.sum(residu,1) # 1D tesnor
+    #         _, indices = torch.topk(residu,k=1024,dim=0,sorted=False)
+    #         X_new = X_test[indices]
+    #         X_new = X_new.clone().detach().requires_grad_(True)
+    #         X = torch.vstack((X,X_new))
+    #         print(f"==>> X-RAD: {X.shape}")
 
-        elif method == 'RAD':
+    #     elif method == 'RAD':
 
-            greedyNum = 256
-            X_test = self.domain.add_collocation_points(n_collocation=1024,random_seed=None)
-            X_test = X_test.requires_grad_().float().to(self.device)
-            residu = self.residual_PDE(X_test)
-            residu = torch.pow(residu,2).to(self.device)
-            residu = torch.sum(residu,1) # 1D tensor
-            distribution = residu/torch.sum(residu)
-            indices = torch.multinomial(distribution,greedyNum)
-            X_new = X_test[indices]
-            X_new = X_new.clone().detach().requires_grad_(True)
-            X = torch.vstack((X,X_new))
-            print(f"==>> X-RAD: {X.shape}")
+    #         greedyNum = 256
+    #         X_test = self.domain.add_collocation_points(n_collocation=1024,random_seed=None)
+    #         X_test = X_test.requires_grad_().float().to(self.device)
+    #         residu = self.residual_PDE(X_test)
+    #         residu = torch.pow(residu,2).to(self.device)
+    #         residu = torch.sum(residu,1) # 1D tensor
+    #         distribution = residu/torch.sum(residu)
+    #         indices = torch.multinomial(distribution,greedyNum)
+    #         X_new = X_test[indices]
+    #         X_new = X_new.clone().detach().requires_grad_(True)
+    #         X = torch.vstack((X,X_new))
+    #         print(f"==>> X-RAD: {X.shape}")
 
-        elif method == 'EVO':
-            residu = self.residual_PDE(X)
-            residu = torch.pow(residu,2).to(self.device)
-            residu = torch.sum(residu,1) # 1D tensor
-            threshold = torch.mean(residu)
-            indices = torch.nonzero((residu>=threshold)*1,as_tuple=True)[0]
-            # myindices = torch.stack(list(torch.nonzero((residu>=threshold)*1,as_tuple=True)[0]),dim=0)
-            X_evo = X[indices]
-            X_evo = X_evo.clone().detach().requires_grad_(True)
+    #     elif method == 'EVO':
+    #         residu = self.residual_PDE(X)
+    #         residu = torch.pow(residu,2).to(self.device)
+    #         residu = torch.sum(residu,1) # 1D tensor
+    #         threshold = torch.mean(residu)
+    #         indices = torch.nonzero((residu>=threshold)*1,as_tuple=True)[0]
+    #         # myindices = torch.stack(list(torch.nonzero((residu>=threshold)*1,as_tuple=True)[0]),dim=0)
+    #         X_evo = X[indices]
+    #         X_evo = X_evo.clone().detach().requires_grad_(True)
 
-            n_rand = X.shape[0]-X_evo.shape[0]
-            X_rand = self.domain.add_collocation_points(n_collocation=n_rand,random_seed=None)
-            X_rand = X_rand.requires_grad_().float().to(self.device) 
+    #         n_rand = X.shape[0]-X_evo.shape[0]
+    #         X_rand = self.domain.add_collocation_points(n_collocation=n_rand,random_seed=None)
+    #         X_rand = X_rand.requires_grad_().float().to(self.device) 
 
-            X = torch.vstack((X_evo,X_rand))
-            X = X.clone().detach().requires_grad_(True)
-            print(f"==>> X-EVO: {X.shape}")
+    #         X = torch.vstack((X_evo,X_rand))
+    #         X = X.clone().detach().requires_grad_(True)
+    #         print(f"==>> X-EVO: {X.shape}")
             
-        else:
-            print('Please check again the method for adaptive sampling !')
-        return X
+    #     else:
+    #         print('Please check again the method for adaptive sampling !')
+    #     return X
     
-    def clear_cuda(self):
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+   

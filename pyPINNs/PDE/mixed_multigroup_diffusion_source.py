@@ -7,10 +7,14 @@ from ..Tools.operator import operator
 
 
 class mixed_multigroup_diffusion_source(mixed_multigroup_diffusion):
-    def __init__(self,domain,model,params_pde,device):
+    def __init__(self,domain,model,params_pde,params_solver,device):
         super().__init__(domain,model,params_pde,device)
         self.params_pde = params_pde
+        self.params_solver = params_solver
         self.initialized = False
+        self.scaling_loss = params_solver.get('scaling_loss',True)
+        if self.scaling_loss:
+            print("Using physics based scaling loss for PINNs !")
 
     def get_cross_sections(self,X):
         if self.params_pde.get('XsEvaluater',None):
@@ -68,12 +72,14 @@ class mixed_multigroup_diffusion_source(mixed_multigroup_diffusion):
         # Compute gradient constraints: 1/D * p_g + ∇phi_g
         grad_constraints = torch.stack([(p[:, g, :] / self.D[:, g:g+1]) + operator.grad(phi[:, g:g+1], X) for g in range(self.G)], dim=1)  # [N, G, d]
 
-        # scale the residuals
-        dTe_inv_sqrt = 1.0 / torch.sqrt(self.Sigma_r + 1e-12)   # [N, G]
-        flux_constrain_scaled = flux_constrain * dTe_inv_sqrt.unsqueeze(-1)  # [N, G, 1]
-        grad_constraints_scaled = grad_constraints * torch.sqrt(self.D + 1e-12).unsqueeze(-1)
-
-        residuals = torch.cat([flux_constrain_scaled, grad_constraints_scaled], dim=-1)  # [N, G, 1+d]
+        
+        if self.scaling_loss:
+            dTe_inv_sqrt = 1.0 / torch.sqrt(self.Sigma_r + 1e-12)   # [N, G]
+            flux_constrain_scaled = flux_constrain * dTe_inv_sqrt.unsqueeze(-1)  # [N, G, 1]
+            grad_constraints_scaled = grad_constraints * torch.sqrt(self.D + 1e-12).unsqueeze(-1)
+            residuals = torch.cat([flux_constrain_scaled, grad_constraints_scaled], dim=-1)  # [N, G, 1+d]
+        else:
+            residuals = torch.cat([flux_constrain, grad_constraints], dim=-1)  # [N, G, 1+d]
 
 
         # # Reconstruct total cross section: Σ_t = Σ_r + Σ_s[g→g]
@@ -85,4 +91,90 @@ class mixed_multigroup_diffusion_source(mixed_multigroup_diffusion):
         
         return residuals   # [N, G, 1+d]
 
-    
+    def new_residual_PDE(self, X):
+        """
+        Calculate the residual of the multigroup neutron diffusion (mixed form)
+        using nondimensionalization. Output shape: [N, G, 1+d]
+        """
+
+        # ----------------------------
+        # 1) Initialize cross sections & reference scales
+        # ----------------------------
+        if not self.initialized:
+            # Load cross sections for the first batch
+            self.get_cross_sections(X)  # fills self.D, self.Sigma_r, self.Sigma_s, self.Sf
+
+            # ---- Compute reference scales using geometric mean ----
+            eps = 1e-12  # avoid log(0)
+            Sigma_r_all = self.Sigma_r.reshape(-1)
+            D_all = self.D.reshape(-1)
+
+            self.Sigma_ref = torch.exp(torch.mean(torch.log(Sigma_r_all + eps)))
+            self.D_ref = torch.exp(torch.mean(torch.log(D_all + eps)))
+            self.L_ref = torch.sqrt(self.D_ref / self.Sigma_ref)
+
+            # Ensure constants are detached
+            self.Sigma_ref = self.Sigma_ref.detach()
+            self.D_ref = self.D_ref.detach()
+            self.L_ref = self.L_ref.detach()
+
+            self.initialized = True
+
+        # ----------------------------
+        # 2) Nondimensionalize inputs & materials
+        # ----------------------------
+        X_tilde = X / self.L_ref
+        D_tilde = self.D / self.D_ref                      # [N, G]
+        Sigma_r_tilde = self.Sigma_r / self.Sigma_ref      # [N, G]
+        Sigma_s_tilde = self.Sigma_s / self.Sigma_ref      # [N, G, G]
+        Sf_tilde = self.Sf / self.Sigma_ref                # [N, G]
+
+        # ----------------------------
+        # 3) Model evaluation
+        # ----------------------------
+        zeta = self.model(X_tilde)
+        phi_list, p_list = self.unpack_solution(zeta, self.output_format)
+
+        phi = torch.cat(phi_list, dim=1)        # [N, G]
+        p = torch.stack(p_list, dim=1)          # [N, G, d]
+
+        # ----------------------------
+        # 4) Te operator (scaled)
+        # ----------------------------
+        Te = -Sigma_s_tilde.clone()                         # [N, G, G]
+        Te[:, torch.arange(self.G), torch.arange(self.G)] = Sigma_r_tilde
+
+        # ----------------------------
+        # 5) Divergence of current (scaled coords)
+        # ----------------------------
+        div_p = torch.stack(
+            [operator.div(p[:, g, :], X_tilde) for g in range(self.G)],
+            dim=1
+        )  # [N, G, 1]
+
+        # ----------------------------
+        # 6) Flux equation residual (dimensionless)
+        # ----------------------------
+        flux_constrain = (
+            div_p
+            + torch.bmm(Te, phi.unsqueeze(-1))
+            - Sf_tilde.unsqueeze(-1)
+        )  # [N, G, 1]
+
+        # ----------------------------
+        # 7) Current equation residual (dimensionless)
+        # ----------------------------
+        grad_constraints = torch.stack(
+            [
+                (p[:, g, :] / D_tilde[:, g:g+1]) + operator.grad(phi[:, g:g+1], X_tilde)
+                for g in range(self.G)
+            ],
+            dim=1
+        )  # [N, G, d]
+
+        # ----------------------------
+        # 8) Combine residuals
+        # ----------------------------
+        residuals = torch.cat([flux_constrain, grad_constraints], dim=-1)  # [N, G, 1+d]
+
+        return residuals

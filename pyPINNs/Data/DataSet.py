@@ -51,7 +51,7 @@ class DataSet:
         # self.X_test   = torch.tensor(X_test , requires_grad=False).float().to(device) # Test points
         
         X_test = self.domain.add_test_points(n_test=n_test)
-        self.X_test = X_test.requires_grad_(False).float().to(device)
+        self.X_test = X_test.requires_grad_(True).float().to(device)
         
     def generate_currents_points(self,n_test,device):
         Xc_test = self.domain.add_currents_points(n_test=n_test)
@@ -75,7 +75,9 @@ class DataSet:
             if load_dir is not None:
                 print('Load reference solution for monogroup!')
                 phi_test   = pickle.load(open(load_dir,"rb"))
-                self.phi_test   = torch.tensor(phi_test, requires_grad=False).float().to(self.device)
+                # self.phi_test   = torch.tensor(phi_test, requires_grad=False).float().to(self.device)
+                # Load monogroup like multigroup
+                self.phi_test   = [torch.tensor(phi_test, requires_grad=False).float().to(self.device)]
             elif f_exact is not None:
                 print('Evaluate exact solution!')
                 self.phi_test = f_exact(self.X_test)
@@ -100,8 +102,9 @@ class DataSet:
             if load_dir is not None:
                 print('Load reference currents!')
                 p_test   = pickle.load(open(load_dir,"rb"))
-                self.p_test   = [torch.tensor(p_test[idim], requires_grad=False).float().to(self.device) for idim in range(self.domain.input_dim)]
-
+                # self.p_test   = [torch.tensor(p_test[idim], requires_grad=False).float().to(self.device) for idim in range(self.domain.input_dim)]
+                #  Load monogroup like multigroup
+                self.p_test   = [[torch.tensor(p_test[idim], requires_grad=False).float().to(self.device) for idim in range(self.domain.input_dim)]]
             else:
                 print('Set default value for p_test')
                 self.p_test = None       

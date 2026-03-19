@@ -10,7 +10,7 @@ project_dir  = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.append(str(project_dir))
 
 from pyPINNs.Domain.squareShape import SquareDomain
-from pyPINNs.PDE.NTE_AF_SF import NeutronTransportAngularFluxScalarFlux
+from pyPINNs.PDE_dev.NTE_AF_SF import NeutronTransportAngularFluxScalarFlux
 from pyPINNs.Mesh.CartesianMesh import CartesianMesh
 from pyPINNs.Tools.visualization import visualization
 from pyPINNs.Tools.basic_utils import check_create_dir

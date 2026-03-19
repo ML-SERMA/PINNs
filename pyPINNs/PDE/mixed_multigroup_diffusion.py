@@ -70,72 +70,162 @@ class mixed_multigroup_diffusion(pdeBase):
         p_pred = [[self.model.forward(Xc_test[idim])[:,igroup*(ndim+1) + (idim+1): igroup*(ndim+1) +(idim+2)] for idim in range(ndim)] for igroup in range(ngroup)]
         return p_pred
     
-    # def currents_predict(self, Xc_test):
-    #     """
-    #     Predicts current components J_{g,d} from the model for each group g and direction d.
-
-    #     Works with two output formats:
-    #         - 'interleave': [φ₀, J₀¹, ..., J₀^d, φ₁, J₁¹, ..., φ_G, J_G^d]
-    #         - 'block':       [φ₀, φ₁, ..., φ_G, J₀¹, ..., J_G^d]
-
-    #     Args:
-    #         Xc_test (list of torch.Tensor): list of length ndim,
-    #             where Xc_test[d] is the test set for direction d (shape [N, input_dim])
-
-    #     Returns:
-    #         p_pred[g][d] = J_g^d evaluated at points Xc_test[d], shape [N, 1]
-    #     """
-    #     ndim = self.domain.input_dim
-    #     G = self.G
-
-    #     p_pred = []
-
-    #     for g in range(G):
-    #         group_currents = []
-    #         for d in range(ndim):
-    #             z_d = self.model.forward(Xc_test[d])
-    #             if self.output_format == 'interleave':
-    #                 idx = g * (ndim + 1) + (d + 1)
-    #             else:  # block
-    #                 idx = G + g * ndim + d
-    #             j_gd = z_d[:, idx : idx + 1]
-    #             group_currents.append(j_gd)
-    #         p_pred.append(group_currents)
-
-    #     return p_pred  # shape: [G][ndim], each [N, 1]
+    
 
     
-    def get_phi_test(self,X_test,phi_test,normalization=False):
+    # def get_phi_test(self,X_test,phi_test,normalization=False):
 
+    #     ngroup = self.G
+    #     phi_pred = self.phi_predict(X_test) 
+    #     mass_phi_pred = torch.sum(torch.vstack(phi_pred))
+    #     mass_phi_test = torch.sum(torch.vstack(phi_test))
+
+    #     if normalization:
+    #         phi_pred = [phi_pred[igroup]/mass_phi_pred for igroup in range(ngroup)]
+    #         phi_test = [phi_test[igroup]/mass_phi_test for igroup in range(ngroup)]
+    #     phi_AE = [torch.abs(phi_test[igroup]-phi_pred[igroup]) for igroup in range(ngroup)]
+    #     phi_REL_L2 = torch.linalg.vector_norm(torch.vstack(phi_test)-torch.vstack(phi_pred))/torch.linalg.vector_norm(torch.vstack(phi_test)) 
+    #     return phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test
+    
+    # def get_currents_test(self,Xc_test,p_test,normalization=False,mass_pred=1.0,mass_test=1.0):
+    
+    #     p_pred = self.currents_predict(Xc_test)
+    #     ngroup = self.G
+    #     if normalization:
+    #         p_pred = [ [ p_pred[igroup][idim]/mass_pred for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+    #         p_test = [ [ p_test[igroup][idim]/mass_test for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+
+    #     p_AE    = [[torch.abs(p_test[igroup][idim]-p_pred[igroup][idim]) for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]# list
+    #     p_AE_g  = [ torch.vstack(p_AE[igroup])    for igroup in range(ngroup)]
+    #     p_test_g = [torch.vstack(p_test[igroup])    for igroup in range(ngroup)]
+    #     p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE_g))/torch.linalg.vector_norm(torch.vstack(p_test_g)) 
+    
+    #     return p_REL_L2, p_AE, p_pred, p_test
+    
+    
+
+    def get_phi_test(self, X_test, phi_test, normalization=False):
         ngroup = self.G
-        phi_pred = self.phi_predict(X_test) 
-        mass_phi_pred = torch.sum(torch.vstack(phi_pred))
-        # print(f"==>> mass_phi_pred: {mass_phi_pred}")
-        mass_phi_test = torch.sum(torch.vstack(phi_test))
-        # print(f"==>> mass_phi_test: {mass_phi_test}")
+        phi_pred = self.phi_predict(X_test)
+
+        # Stack once (global view)
+        phi_pred_stack = torch.cat(phi_pred, dim=0)
+        phi_test_stack = torch.cat(phi_test, dim=0)
+
+        # Mass 
+        mass_phi_pred = torch.sum(phi_pred_stack)
+        mass_phi_test = torch.sum(phi_test_stack)
+
+        eps = 1e-14
         if normalization:
-            phi_pred = [phi_pred[igroup]/mass_phi_pred for igroup in range(ngroup)]
-            phi_test = [phi_test[igroup]/mass_phi_test for igroup in range(ngroup)]
-        phi_AE = [torch.abs(phi_test[igroup]-phi_pred[igroup]) for igroup in range(ngroup)]
-        phi_REL_L2 = torch.linalg.vector_norm(torch.vstack(phi_test)-torch.vstack(phi_pred))/torch.linalg.vector_norm(torch.vstack(phi_test)) 
-        return phi_REL_L2, phi_AE, phi_pred, phi_test,mass_phi_pred, mass_phi_test
-    
+            phi_pred = [p / mass_phi_pred for p in phi_pred]
+            phi_test = [p / mass_phi_test for p in phi_test]
+            # Stack once (global view)
+            phi_pred_stack = torch.cat(phi_pred, dim=0)
+            phi_test_stack = torch.cat(phi_test, dim=0)
+
+
+
+        # Per-group absolute error
+        phi_AE = [
+            torch.abs(phi_test[g] - phi_pred[g])
+            for g in range(ngroup)
+        ]
+
+        # Per-group relative L2  (LIST)
+        phi_REL_L2 = [
+            torch.linalg.vector_norm(phi_test[g] - phi_pred[g])/(torch.linalg.vector_norm(phi_test[g]) + eps)
+            for g in range(ngroup)
+        ]
+
+        # Global relative L2  (SCALAR)
+        phi_REL_L2_global = (
+            torch.linalg.vector_norm(phi_test_stack - phi_pred_stack)/(torch.linalg.vector_norm(phi_test_stack) + eps)
+        )
+
+        return (
+            phi_REL_L2_global,    # scalar
+            phi_REL_L2,           # list (per group)
+            phi_AE,               # list (per group)
+            phi_pred,
+            phi_test,
+            mass_phi_pred,
+            mass_phi_test,
+        )
+
+
+
     def get_currents_test(self,Xc_test,p_test,normalization=False,mass_pred=1.0,mass_test=1.0):
-    
+
         p_pred = self.currents_predict(Xc_test)
         ngroup = self.G
-        if normalization:
-            p_pred = [ [ p_pred[igroup][idim]/mass_pred for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
-            p_test = [ [ p_test[igroup][idim]/mass_test for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]
+        ndim = self.domain.input_dim
+        eps = 1e-14
 
-        p_AE    = [[torch.abs(p_test[igroup][idim]-p_pred[igroup][idim]) for idim in range(self.domain.input_dim)] for igroup in range(ngroup)]# list
-        p_AE_g  = [ torch.vstack(p_AE[igroup])    for igroup in range(ngroup)]
-        p_test_g = [torch.vstack(p_test[igroup])    for igroup in range(ngroup)]
-        p_REL_L2 =  torch.linalg.vector_norm(torch.vstack(p_AE_g))/torch.linalg.vector_norm(torch.vstack(p_test_g)) 
-    
-        return p_REL_L2, p_AE, p_pred, p_test
-    
-    
+        # Optional normalization
+        if normalization:
+            p_pred = [
+                [p_pred[g][d] / (mass_pred + eps) for d in range(ndim)]
+                for g in range(ngroup)
+            ]
+            p_test = [
+                [p_test[g][d] / (mass_test + eps) for d in range(ndim)]
+                for g in range(ngroup)
+            ]
+
+        # Absolute error per group per dimension
+        p_AE = [
+            [torch.abs(p_test[g][d] - p_pred[g][d]) for d in range(ndim)]
+            for g in range(ngroup)
+        ]
+
+        # Stack each group (all dimensions together)
+        p_pred_g = [
+            torch.cat([p_pred[g][d].reshape(-1) for d in range(ndim)], dim=0)
+            for g in range(ngroup)
+        ]
+
+        p_test_g = [
+            torch.cat([p_test[g][d].reshape(-1) for d in range(ndim)], dim=0)
+            for g in range(ngroup)
+        ]
+
+        p_AE_g = [
+            torch.cat([p_AE[g][d].reshape(-1) for d in range(ndim)], dim=0)
+            for g in range(ngroup)
+        ]
+
+        # Per-group REL_L2
+        p_REL_L2 = [
+            torch.linalg.vector_norm(p_AE_g[g])
+            / (torch.linalg.vector_norm(p_test_g[g]) + eps)
+            for g in range(ngroup)
+        ]
+
+        # Global stacking (all groups)
+        p_pred_stack = torch.cat(p_pred_g, dim=0)
+        p_test_stack = torch.cat(p_test_g, dim=0)
+
+        # Global REL_L2
+        p_REL_L2_global = (
+            torch.linalg.vector_norm(p_test_stack - p_pred_stack)
+            / (torch.linalg.vector_norm(p_test_stack) + eps)
+        )
+
+        return (
+            p_REL_L2_global,          # global
+            p_REL_L2,                 # per group
+            p_AE,                     # per group per dimension
+            p_pred,                   # per group per dimension
+            p_test,                   # per group per dimension
+        )
+
+
+
+
+
+
+
     def get_cross_sections(self,X):
         if self.params_pde.get('XsEvaluater',None):
             print(" get cross sections from XsEvaluater")

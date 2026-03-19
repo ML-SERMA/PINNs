@@ -316,41 +316,94 @@ class visualization:
     #     else:
     #         print('Pass')
 
+    # @staticmethod
+    # def show_loss(pathFile,save_dir,Error_phi=False,Error_p=False):
+    #     if Error_phi and Error_p:
+    #         df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','Loss','Loss_BC','Loss_PDE','Error_phi','Error_p'])
+    #         fig, axes = plt.subplots(nrows=1, ncols=3)
+    #         df.plot(x='Iter',y='Loss',ax=axes[0],loglog=True)
+    #         df.plot(x='Iter',y='Loss_BC',ax=axes[1],loglog=True)
+    #         df.plot(x='Iter',y='Loss_PDE',ax=axes[2],loglog=True)
+    #         plt.savefig(save_dir+'loss_train.png')
+
+    #         fig, axes = plt.subplots(nrows=1, ncols=2)
+    #         df.plot(x='Iter',y='Error_phi',ax=axes[0],loglog=True)
+    #         df.plot(x='Iter',y='Error_p',ax=axes[1],loglog=True)
+    #         plt.savefig(save_dir+'loss_test.png')
+
+
+    #     elif Error_phi and not Error_p:
+    #         df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','Loss','Loss_BC','Loss_PDE','Error_phi'])
+    #         fig, axes = plt.subplots(nrows=2, ncols=2)
+    #         # Plot the Error
+    #         df.plot(x='Iter',y='Loss',ax=axes[0,0],loglog=True)
+    #         df.plot(x='Iter',y='Loss_BC',ax=axes[0,1],loglog=True)
+    #         df.plot(x='Iter',y='Loss_PDE',ax=axes[1,0],loglog=True)
+    #         df.plot(x='Iter',y='Error_phi',ax=axes[1,1],loglog=True)
+    #         plt.savefig(save_dir+'loss_train_test.png')
+    #     else:
+    #         df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','Loss','Loss_BC','Loss_PDE'])
+    #         fig, axes = plt.subplots(nrows=1, ncols=3)
+    #         fig.set_figheight(5)
+    #         fig.set_figwidth(19)
+    #         # Plot the Error
+    #         df.plot(x='Iter',y='Loss',ax=axes[0],loglog=True)
+    #         df.plot(x='Iter',y='Loss_BC',ax=axes[1],loglog=True)
+    #         df.plot(x='Iter',y='Loss_PDE',ax=axes[2],loglog=True)
+    #         plt.savefig(save_dir+'loss_train.png')
     @staticmethod
-    def show_loss(pathFile,save_dir,Error_phi=False,Error_p=False):
-        if Error_phi and Error_p:
-            df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','Loss','Loss_BC','Loss_PDE','Error_phi','Error_p'])
-            fig, axes = plt.subplots(nrows=1, ncols=3)
-            df.plot(x='Iter',y='Loss',ax=axes[0],loglog=True)
-            df.plot(x='Iter',y='Loss_BC',ax=axes[1],loglog=True)
-            df.plot(x='Iter',y='Loss_PDE',ax=axes[2],loglog=True)
-            plt.savefig(save_dir+'loss_train.png')
+    def show_loss(pathFile, save_dir, n_phi_groups=0, n_p_groups=0):
+        """
+        Show training losses and test errors.
 
-            fig, axes = plt.subplots(nrows=1, ncols=2)
-            df.plot(x='Iter',y='Error_phi',ax=axes[0],loglog=True)
-            df.plot(x='Iter',y='Error_p',ax=axes[1],loglog=True)
-            plt.savefig(save_dir+'loss_test.png')
+        Args:
+            pathFile: CSV log file
+            save_dir: directory to save plots
+            n_phi_groups: number of flux groups
+            n_p_groups: number of currents groups
+        """
+        # --- Build column names ---
+        header = ['Iter', 'Loss', 'Loss_BC', 'Loss_PDE']
 
+        # Flux errors
+        if n_phi_groups > 0:
+            header.append('Error_phi_global')
+            header.extend([f'Error_phi_g{g}' for g in range(n_phi_groups)])
 
-        elif Error_phi and not Error_p:
-            df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','Loss','Loss_BC','Loss_PDE','Error_phi'])
-            fig, axes = plt.subplots(nrows=2, ncols=2)
-            # Plot the Error
-            df.plot(x='Iter',y='Loss',ax=axes[0,0],loglog=True)
-            df.plot(x='Iter',y='Loss_BC',ax=axes[0,1],loglog=True)
-            df.plot(x='Iter',y='Loss_PDE',ax=axes[1,0],loglog=True)
-            df.plot(x='Iter',y='Error_phi',ax=axes[1,1],loglog=True)
-            plt.savefig(save_dir+'loss_train_test.png')
-        else:
-            df = pd.read_csv(pathFile, delimiter='\s+',skiprows=1,names=['Iter','Loss','Loss_BC','Loss_PDE'])
-            fig, axes = plt.subplots(nrows=1, ncols=3)
-            fig.set_figheight(5)
-            fig.set_figwidth(19)
-            # Plot the Error
-            df.plot(x='Iter',y='Loss',ax=axes[0],loglog=True)
-            df.plot(x='Iter',y='Loss_BC',ax=axes[1],loglog=True)
-            df.plot(x='Iter',y='Loss_PDE',ax=axes[2],loglog=True)
-            plt.savefig(save_dir+'loss_train.png')
+        # Currents errors
+        if n_p_groups > 0:
+            header.append('Error_p_global')
+            header.extend([f'Error_p_g{g}' for g in range(n_p_groups)])
+
+        # --- Read CSV ---
+        df = pd.read_csv(pathFile, delimiter='\s+', skiprows=1, names=header)
+
+        # --- Plot training losses ---
+        fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(18, 5))
+        df.plot(x='Iter', y='Loss', ax=axes[0], loglog=True)
+        df.plot(x='Iter', y='Loss_BC', ax=axes[1], loglog=True)
+        df.plot(x='Iter', y='Loss_PDE', ax=axes[2], loglog=True)
+        plt.savefig(save_dir+'loss_train.png')
+
+        # --- Plot flux errors if available ---
+        if n_phi_groups > 0:
+            fig, ax = plt.subplots(figsize=(6, 5))
+            df.plot(x='Iter', y='Error_phi_global', ax=ax, loglog=True, label='phi_global')
+            # Plot per-group flux errors
+            for g in range(n_phi_groups):
+                df.plot(x='Iter', y=f'Error_phi_g{g}', ax=ax, loglog=True, label=f'phi_g{g}')
+            plt.legend()
+            plt.savefig(save_dir+'error_phi.png')
+
+        # --- Plot currents errors if available ---
+        if n_p_groups > 0:
+            fig, ax = plt.subplots(figsize=(6, 5))
+            df.plot(x='Iter', y='Error_p_global', ax=ax, loglog=True, label='p_global')
+            for g in range(n_p_groups):
+                df.plot(x='Iter', y=f'Error_p_g{g}', ax=ax, loglog=True, label=f'p_g{g}')
+            plt.legend()
+            plt.savefig(save_dir+'error_p.png')
+
     @staticmethod
     def show_history_residuals(pathFile,save_dir,keff_ref_exist=False):
 
@@ -525,11 +578,316 @@ class visualization:
     #         plt.savefig(save_dir+name)
 
 
+    # @staticmethod
+    # def viewFlux(mesh, phi_pred, save_dir, name='flux_pred.png', order='C'):
+    #     """
+    #     Visualizes the scalar flux (phi_pred) for both 2D and 3D cases.
+        
+    #     Parameters:
+    #     -----------
+    #     mesh : object
+    #         Mesh object with attributes: ndim, xmid, xmin, xmax
+    #     phi_pred : torch.Tensor
+    #         Predicted flux values, shape (N, 1) where N = nx*ny (2D) or nx*ny*nz (3D)
+    #     save_dir : str
+    #         Directory to save the plot
+    #     name : str
+    #         File name to save the figure
+    #     order : str
+    #         'C' or 'F' order used when reshaping for visualization
+    #     """
+    #     ndim = mesh.ndim
+    #     os.makedirs(save_dir, exist_ok=True)
+
+    #     if ndim == 2:
+    #         centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+    #         xmid, ymid = centers
+    #         xmin = mesh.xmin.detach().cpu().numpy()
+    #         xmax = mesh.xmax.detach().cpu().numpy()
+    #         nx, ny = xmid.shape[0], ymid.shape[0]
+    #         bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+    #         phi = phi_pred.cpu().detach().numpy().reshape((nx, ny), order='C')
+    #         plt.figure(figsize=(8, 6))
+    #         im = plt.imshow(phi.T, cmap='rainbow', interpolation="none", origin='lower', aspect='auto', extent=bounds)
+    #         plt.colorbar(im)
+    #         plt.xlabel('X')
+    #         plt.ylabel('Y')
+    #         plt.title('Predicted Scalar Flux')
+    #         plt.tight_layout()
+    #         plt.savefig(os.path.join(save_dir, name))
+    #         plt.close()
+
+    #     elif ndim == 3:
+    #         centers = [center.detach().cpu().numpy() for center in mesh.centers]
+    #         xmid, ymid, zmid = centers
+    #         xmin = mesh.xmin.detach().cpu().numpy()
+    #         xmax = mesh.xmax.detach().cpu().numpy()
+    #         nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+    #         bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+
+    #         phi = phi_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+    #         index_z = nz // 2
+    #         phi_slice = phi[:, :, index_z].T  # Transpose to align with (X, Y) for imshow
+
+    #         plt.figure(figsize=(8, 6))
+    #         im = plt.imshow(phi_slice, cmap='rainbow', interpolation="none", origin='lower', aspect='auto', extent=bounds)
+    #         plt.colorbar(im)
+    #         plt.xlabel('X')
+    #         plt.ylabel('Y')
+    #         plt.title(f'Predicted Scalar Flux (Z-slice {index_z})')
+    #         plt.tight_layout()
+    #         plt.savefig(os.path.join(save_dir, name))
+    #         plt.close()
+
+    #     else:
+    #         raise ValueError("Only 2D and 3D are supported.")
+
+    # @staticmethod
+    # def viewErrorAndFlux(mesh, flux_error, flux_pred, flux_test, save_dir, name='flux_test.png', order='C'):
+    #     """
+    #     Visualize error, predicted, and reference scalar flux for 2D and 3D meshes.
+
+    #     Parameters:
+    #     - mesh: object with attributes ndim, xmin, xmax, xmid
+    #     - flux_error, flux_pred, flux_test: torch tensors of shape (N,) or (num_nodes,)
+    #     - save_dir: directory to save the figure
+    #     - name: filename for the figure
+    #     - order: 'C' or 'F' for numpy reshape order
+    #     """
+
+    #     ndim = mesh.ndim
+
+    #     if ndim == 2:
+    #         centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+    #         xmid, ymid = centers
+    #         xmin = mesh.xmin.detach().cpu().numpy()
+    #         xmax = mesh.xmax.detach().cpu().numpy()
+    #         nx, ny = xmid.shape[0], ymid.shape[0]
+    #         bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+    #         # Reshape arrays (assume nodal data size = nx * ny)
+    #         error_np = flux_error.cpu().detach().numpy().reshape((nx, ny), order=order)
+    #         pred_np = flux_pred.cpu().detach().numpy().reshape((nx, ny), order=order)
+    #         test_np = flux_test.cpu().detach().numpy().reshape((nx, ny), order=order)
+
+    #         # Transpose if Fortran order
+    #         # if order == 'F':
+    #         error_np = error_np.T
+    #         pred_np = pred_np.T
+    #         test_np = test_np.T
+
+    #         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+    #         im0 = axs[0].imshow(error_np, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
+    #         axs[0].set_title('Absolute Error')
+    #         axs[0].set_xlabel('X')
+    #         axs[0].set_ylabel('Y')
+    #         plt.colorbar(im0, ax=axs[0])
+
+    #         im1 = axs[1].imshow(pred_np, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+    #         axs[1].set_title('Predicted Flux')
+    #         axs[1].set_xlabel('X')
+    #         axs[1].set_ylabel('Y')
+    #         plt.colorbar(im1, ax=axs[1])
+
+    #         im2 = axs[2].imshow(test_np, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+    #         axs[2].set_title('Reference Flux')
+    #         axs[2].set_xlabel('X')
+    #         axs[2].set_ylabel('Y')
+    #         plt.colorbar(im2, ax=axs[2])
+
+    #         plt.tight_layout()
+    #         plt.savefig(save_dir + name)
+    #         plt.close()
+
+    #     elif ndim == 3:
+            
+    #         centers = [center.detach().cpu().numpy() for center in mesh.centers]
+    #         xmid, ymid, zmid = centers
+    #         xmin = mesh.xmin.detach().cpu().numpy()
+    #         xmax = mesh.xmax.detach().cpu().numpy()
+    #         nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+    #         bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+    #         # Reshape nodal data
+    #         error_np = flux_error.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+    #         pred_np = flux_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+    #         test_np = flux_test.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
+
+    #         index_z = nz // 2  # middle slice along z
+
+    #         slice_error = error_np[:, :, index_z]
+    #         slice_pred = pred_np[:, :, index_z]
+    #         slice_test = test_np[:, :, index_z]
+
+    #         # Transpose for Fortran order
+    #         if order == 'F':
+    #             slice_error = slice_error.T
+    #             slice_pred = slice_pred.T
+    #             slice_test = slice_test.T
+
+    #         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+    #         im0 = axs[0].imshow(slice_error, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
+    #         axs[0].set_title(f'Absolute Error (slice z={index_z})')
+    #         axs[0].set_xlabel('X')
+    #         axs[0].set_ylabel('Y')
+    #         plt.colorbar(im0, ax=axs[0])
+
+    #         im1 = axs[1].imshow(slice_pred, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+    #         axs[1].set_title(f'Predicted Flux (slice z={index_z})')
+    #         axs[1].set_xlabel('X')
+    #         axs[1].set_ylabel('Y')
+    #         plt.colorbar(im1, ax=axs[1])
+
+    #         im2 = axs[2].imshow(slice_test, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
+    #         axs[2].set_title(f'Reference Flux (slice z={index_z})')
+    #         axs[2].set_xlabel('X')
+    #         axs[2].set_ylabel('Y')
+    #         plt.colorbar(im2, ax=axs[2])
+
+    #         plt.tight_layout()
+    #         plt.savefig(save_dir + name)
+    #         plt.close()
+
+
+
+    # @staticmethod
+    # def viewErrorAndCurrents(mesh, p_error, p_pred, p_test, save_dir, name='error_currents_test.png', order='C'):
+    #     """
+    #     Visualize error, predicted, and test currents for 2D and 3D meshes.
+
+    #     Parameters:
+    #     - mesh: object with attributes ndim, xmin, xmax, centers...
+    #     - p_error, p_pred, p_test: list of tensors (length ndim) for each component current
+    #     - save_dir: directory to save the figure
+    #     - name: filename for the figure
+    #     - order: 'C' or 'F' for numpy reshape order
+    #     """
+
+    #     ndim = mesh.ndim
+    #     if ndim == 2:
+    #         centers = [center.detach().cpu().numpy() for center in mesh.centers]
+                
+    #         xmid, ymid = centers
+    #         xmin = mesh.xmin.detach().cpu().numpy()
+    #         xmax = mesh.xmax.detach().cpu().numpy()
+    #         nx, ny = xmid.shape[0], ymid.shape[0]
+    #         bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+    #         # Sizes for current components:
+    #         # sizes = [(ny, nx + 1), (ny + 1, nx)]  # note: ny first because image vertical axis is Y
+    #         sizes = [(nx + 1,ny), (nx,ny + 1)]
+            
+    #         P_error = [p_error[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+    #         P_pred = [p_pred[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+    #         P_test = [p_test[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+
+    #         fig = plt.figure(figsize=(20, 10))
+
+    #         for i in range(ndim):
+    #             # transpose if order=='F', else no transpose
+    #             # data_error = P_error[i].T if order == 'F' else P_error[i]
+    #             # data_pred = P_pred[i].T if order == 'F' else P_pred[i]
+    #             # data_test = P_test[i].T if order == 'F' else P_test[i]
+
+    #             data_error = P_error[i].T 
+    #             data_pred = P_pred[i].T 
+    #             data_test = P_test[i].T 
+
+    #             ax1 = plt.subplot(2, 3, 3 * i + 1)
+    #             im1 = plt.imshow(data_error, cmap='gist_earth', interpolation="none", aspect='auto',
+    #                             origin='lower', extent=bounds)
+    #             plt.colorbar(im1)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax1.set_title("Absolute Error")
+
+    #             ax2 = plt.subplot(2, 3, 3 * i + 2)
+    #             im2 = plt.imshow(data_pred, cmap='rainbow', interpolation="none", aspect='auto',
+    #                             origin='lower', extent=bounds)
+    #             plt.colorbar(im2)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax2.set_title("Predicted Solution")
+
+    #             ax3 = plt.subplot(2, 3, 3 * i + 3)
+    #             im3 = plt.imshow(data_test, cmap='rainbow', interpolation="none", aspect='auto',
+    #                             origin='lower', extent=bounds)
+    #             plt.colorbar(im3)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax3.set_title("Reference Solution")
+
+    #         plt.savefig(save_dir + name)
+    #         plt.close()
+
+    #     elif ndim == 3:
+            
+    #         centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+    #         xmid, ymid, zmid = centers
+    #         xmin = mesh.xmin.detach().cpu().numpy()
+    #         xmax = mesh.xmax.detach().cpu().numpy()
+    #         nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
+    #         bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+
+    #         # Sizes for 3D current components
+    #         sizes = [(nx + 1, ny, nz), (nx, ny + 1, nz), (nx, ny, nz + 1)]
+
+    #         P_error = [p_error[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+    #         P_pred = [p_pred[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+    #         P_test = [p_test[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
+
+    #         index_z = nz // 2  # slice in the middle along z-axis
+
+    #         fig = plt.figure(figsize=(20, 10))
+
+    #         for i in range(ndim):
+    #             # Slice at fixed z-index and transpose if needed
+    #             slice_error = P_error[i][:, :, index_z]
+    #             slice_pred = P_pred[i][:, :, index_z]
+    #             slice_test = P_test[i][:, :, index_z]
+
+    #             # Transpose for order='F', else no transpose
+    #             if order == 'F':
+    #                 slice_error = slice_error.T
+    #                 slice_pred = slice_pred.T
+    #                 slice_test = slice_test.T
+
+    #             ax1 = plt.subplot(3, 3, 3 * i + 1)
+    #             im1 = plt.imshow(slice_error, cmap='gist_earth', interpolation="none", aspect='auto',
+    #                             origin='lower', extent=bounds)
+    #             plt.colorbar(im1)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax1.set_title("Absolute Error")
+
+    #             ax2 = plt.subplot(3, 3, 3 * i + 2)
+    #             im2 = plt.imshow(slice_pred, cmap='rainbow', interpolation="none", aspect='auto',
+    #                             origin='lower', extent=bounds)
+    #             plt.colorbar(im2)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax2.set_title("Predicted Solution")
+
+    #             ax3 = plt.subplot(3, 3, 3 * i + 3)
+    #             im3 = plt.imshow(slice_test, cmap='rainbow', interpolation="none", aspect='auto',
+    #                             origin='lower', extent=bounds)
+    #             plt.colorbar(im3)
+    #             plt.xlabel('X')
+    #             plt.ylabel('Y')
+    #             ax3.set_title("Reference Solution")
+
+    #         plt.savefig(save_dir + name)
+    #         plt.close()
+
+    ####################################################################################################
     @staticmethod
-    def viewFlux(mesh, phi_pred, save_dir, name='flux_pred.png', order='C'):
+    def viewFlux(mesh, phi_pred, save_dir, name='flux_pred.png', index='ij'):
         """
         Visualizes the scalar flux (phi_pred) for both 2D and 3D cases.
-        
+
         Parameters:
         -----------
         mesh : object
@@ -540,26 +898,35 @@ class visualization:
             Directory to save the plot
         name : str
             File name to save the figure
-        order : str
-            'C' or 'F' order used when reshaping for visualization
+        index : str
+            'ij' or 'xy', determines reshape and transpose for plotting
         """
+    
+
         ndim = mesh.ndim
         os.makedirs(save_dir, exist_ok=True)
 
         if ndim == 2:
-            centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+            centers = [c.detach().cpu().numpy() for c in mesh.centers]    
             xmid, ymid = centers
+            nx, ny = xmid.shape[0], ymid.shape[0]
             xmin = mesh.xmin.detach().cpu().numpy()
             xmax = mesh.xmax.detach().cpu().numpy()
-            nx, ny = xmid.shape[0], ymid.shape[0]
             bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
-            
-            
-            phi = phi_pred.cpu().detach().numpy().reshape((ny, nx), order=order)
-            # No transpose is needed here, even for Fortran order
+
+            # Determine reshape order
+            if index == 'ij':
+                phi = phi_pred.cpu().detach().numpy().reshape((nx, ny), order='F')
+                phi_plot = phi.T  # transpose for imshow
+            elif index == 'xy':
+                phi = phi_pred.cpu().detach().numpy().reshape((ny, nx), order='C')
+                phi_plot = phi  # no transpose needed for xy
+            else:
+                raise ValueError("index must be 'ij' or 'xy'")
 
             plt.figure(figsize=(8, 6))
-            im = plt.imshow(phi, cmap='rainbow', interpolation="none", origin='lower', aspect='auto', extent=bounds)
+            im = plt.imshow(phi_plot, cmap='rainbow', interpolation="none",
+                            origin='lower', aspect='auto', extent=bounds)
             plt.colorbar(im)
             plt.xlabel('X')
             plt.ylabel('Y')
@@ -569,20 +936,26 @@ class visualization:
             plt.close()
 
         elif ndim == 3:
-            centers = [center.detach().cpu().numpy() for center in mesh.centers]
+            centers = [c.detach().cpu().numpy() for c in mesh.centers]
             xmid, ymid, zmid = centers
+            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
             xmin = mesh.xmin.detach().cpu().numpy()
             xmax = mesh.xmax.detach().cpu().numpy()
-            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
             bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
-
-
-            phi = phi_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
             index_z = nz // 2
-            phi_slice = phi[:, :, index_z].T  # Transpose to align with (X, Y) for imshow
+
+            if index == 'ij':
+                phi = phi_pred.cpu().detach().numpy().reshape((nx, ny, nz), order='F')
+                phi_slice = phi[:, :, index_z].T
+            elif index == 'xy':
+                phi = phi_pred.cpu().detach().numpy().reshape((ny, nx, nz), order='C')
+                phi_slice = phi[:, :, index_z]  # no transpose needed
+            else:
+                raise ValueError("index must be 'ij' or 'xy'")
 
             plt.figure(figsize=(8, 6))
-            im = plt.imshow(phi_slice, cmap='rainbow', interpolation="none", origin='lower', aspect='auto', extent=bounds)
+            im = plt.imshow(phi_slice, cmap='rainbow', interpolation="none",
+                            origin='lower', aspect='auto', extent=bounds)
             plt.colorbar(im)
             plt.xlabel('X')
             plt.ylabel('Y')
@@ -595,41 +968,57 @@ class visualization:
             raise ValueError("Only 2D and 3D are supported.")
 
     @staticmethod
-    def viewErrorAndFlux(mesh, flux_error, flux_pred, flux_test, save_dir, name='flux_test.png', order='C'):
+    def viewErrorAndFlux(mesh, flux_error, flux_pred, flux_test, save_dir, name='flux_test.png', index='ij'):
         """
         Visualize error, predicted, and reference scalar flux for 2D and 3D meshes.
 
         Parameters:
-        - mesh: object with attributes ndim, xmin, xmax, xmid
-        - flux_error, flux_pred, flux_test: torch tensors of shape (N,) or (num_nodes,)
-        - save_dir: directory to save the figure
-        - name: filename for the figure
-        - order: 'C' or 'F' for numpy reshape order
+        -----------
+        mesh : object
+            Mesh object with attributes ndim, xmin, xmax, xmid
+        flux_error, flux_pred, flux_test : torch.Tensor
+            Tensors of shape (N,) where N = nx*ny (2D) or nx*ny*nz (3D)
+        save_dir : str
+            Directory to save the figure
+        name : str
+            Filename for the figure
+        index : str
+            'ij' or 'xy' for meshgrid convention
         """
-
+       
         ndim = mesh.ndim
+        os.makedirs(save_dir, exist_ok=True)
 
         if ndim == 2:
-            centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+            centers = [c.detach().cpu().numpy() for c in mesh.centers]
             xmid, ymid = centers
+            nx, ny = xmid.shape[0], ymid.shape[0]
             xmin = mesh.xmin.detach().cpu().numpy()
             xmax = mesh.xmax.detach().cpu().numpy()
-            nx, ny = xmid.shape[0], ymid.shape[0]
             bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
 
-            # Reshape arrays (assume nodal data size = nx * ny)
-            error_np = flux_error.cpu().detach().numpy().reshape((ny, nx), order=order)
-            pred_np = flux_pred.cpu().detach().numpy().reshape((ny, nx), order=order)
-            test_np = flux_test.cpu().detach().numpy().reshape((ny, nx), order=order)
-
-            # Transpose if Fortran order
-            if order == 'F':
+            # Determine reshape based on meshgrid indexing
+            if index == 'ij':
+                shape = (nx, ny)
+                transpose_plot = True
+                order = 'F'
+            elif index == 'xy':
+                shape = (ny, nx)
+                transpose_plot = False
+                order = 'C'
+            else:
+                raise ValueError("index must be 'ij' or 'xy'")
+            
+            error_np = flux_error.cpu().detach().numpy().reshape(shape, order=order)
+            pred_np = flux_pred.cpu().detach().numpy().reshape(shape, order=order)
+            test_np = flux_test.cpu().detach().numpy().reshape(shape, order=order)
+            if transpose_plot:
                 error_np = error_np.T
                 pred_np = pred_np.T
                 test_np = test_np.T
 
-            fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
+            fig, axs = plt.subplots(1, 3, figsize=(18, 5))
             im0 = axs[0].imshow(error_np, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
             axs[0].set_title('Absolute Error')
             axs[0].set_xlabel('X')
@@ -649,37 +1038,43 @@ class visualization:
             plt.colorbar(im2, ax=axs[2])
 
             plt.tight_layout()
-            plt.savefig(save_dir + name)
+            plt.savefig(os.path.join(save_dir, name))
             plt.close()
 
         elif ndim == 3:
-            
-            centers = [center.detach().cpu().numpy() for center in mesh.centers]
+            centers = [c.detach().cpu().numpy() for c in mesh.centers]
             xmid, ymid, zmid = centers
+            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
             xmin = mesh.xmin.detach().cpu().numpy()
             xmax = mesh.xmax.detach().cpu().numpy()
-            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
             bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+            index_z = nz // 2
 
-            # Reshape nodal data
-            error_np = flux_error.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
-            pred_np = flux_pred.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
-            test_np = flux_test.cpu().detach().numpy().reshape((nx, ny, nz), order=order)
-
-            index_z = nz // 2  # middle slice along z
-
+            # Determine reshape based on meshgrid indexing
+            if index == 'ij':
+                shape = (nx, ny, nz)
+                transpose_plot = True
+                order = 'F'    
+            elif index == 'xy':
+                shape = (ny, nx, nz)
+                transpose_plot = False
+                order = 'C'
+            else:
+                raise ValueError("index must be 'ij' or 'xy'")
+            
+            error_np = flux_error.cpu().detach().numpy().reshape(shape, order=order)
+            pred_np = flux_pred.cpu().detach().numpy().reshape(shape, order=order)
+            test_np = flux_test.cpu().detach().numpy().reshape(shape, order=order)
+            # Take middle slice along z
             slice_error = error_np[:, :, index_z]
             slice_pred = pred_np[:, :, index_z]
             slice_test = test_np[:, :, index_z]
-
-            # Transpose for Fortran order
-            if order == 'F':
+            if transpose_plot:
                 slice_error = slice_error.T
                 slice_pred = slice_pred.T
                 slice_test = slice_test.T
 
             fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-
             im0 = axs[0].imshow(slice_error, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
             axs[0].set_title(f'Absolute Error (slice z={index_z})')
             axs[0].set_xlabel('X')
@@ -699,135 +1094,163 @@ class visualization:
             plt.colorbar(im2, ax=axs[2])
 
             plt.tight_layout()
-            plt.savefig(save_dir + name)
+            plt.savefig(os.path.join(save_dir, name))
             plt.close()
+
+        else:
+            raise ValueError("Only 2D and 3D are supported.")
 
 
 
     @staticmethod
-    def viewErrorAndCurrents(mesh, p_error, p_pred, p_test, save_dir, name='error_currents_test.png', order='C'):
+    def viewErrorAndCurrents(mesh, p_error, p_pred, p_test, save_dir, name='error_currents_test.png', index='ij'):
         """
-        Visualize error, predicted, and test currents for 2D and 3D meshes.
+        Visualize error, predicted, and reference currents for 2D and 3D meshes,
+        supporting both 'ij' and 'xy' meshgrid conventions.
 
         Parameters:
-        - mesh: object with attributes ndim, xmin, xmax, centers...
-        - p_error, p_pred, p_test: list of tensors (length ndim) for each component current
-        - save_dir: directory to save the figure
-        - name: filename for the figure
-        - order: 'C' or 'F' for numpy reshape order
+        -----------
+        mesh : object
+            Mesh object with attributes ndim, xmin, xmax, centers
+        p_error, p_pred, p_test : list of torch.Tensors
+            Each list has length = ndim (components of current), each tensor shape = num_nodes or nodes per component
+        save_dir : str
+            Directory to save the figure
+        name : str
+            Filename for the figure
+        index : str
+            'ij' or 'xy' for meshgrid convention
         """
-
+    
         ndim = mesh.ndim
+        os.makedirs(save_dir, exist_ok=True)
+
         if ndim == 2:
-            centers = [center.detach().cpu().numpy() for center in mesh.centers]
-                
+            centers = [c.detach().cpu().numpy() for c in mesh.centers]
             xmid, ymid = centers
+            nx, ny = xmid.shape[0], ymid.shape[0]
             xmin = mesh.xmin.detach().cpu().numpy()
             xmax = mesh.xmax.detach().cpu().numpy()
-            nx, ny = xmid.shape[0], ymid.shape[0]
             bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
 
-            # Sizes for current components:
-            sizes = [(ny, nx + 1), (ny + 1, nx)]  # note: ny first because image vertical axis is Y
-            
+            # Determine sizes and transpose based on meshgrid indexing
+            if index == 'ij':
+                sizes = [(nx + 1, ny), (nx, ny + 1)]
+                transpose_plot = True
+                order = 'F'
+
+            elif index == 'xy':
+                sizes = [(ny, nx + 1), (ny + 1, nx)]
+                transpose_plot = False
+                order = 'C'
+            else:
+                raise ValueError("index must be 'ij' or 'xy'")
+
+             # Reshape each component
             P_error = [p_error[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
             P_pred = [p_pred[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
             P_test = [p_test[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
-
             fig = plt.figure(figsize=(20, 10))
-
             for i in range(ndim):
-                # transpose if order=='F', else no transpose
-                data_error = P_error[i].T if order == 'F' else P_error[i]
-                data_pred = P_pred[i].T if order == 'F' else P_pred[i]
-                data_test = P_test[i].T if order == 'F' else P_test[i]
+                data_error = P_error[i].T if transpose_plot else P_error[i]
+                data_pred = P_pred[i].T if transpose_plot else P_pred[i]
+                data_test = P_test[i].T if transpose_plot else P_test[i]
 
                 ax1 = plt.subplot(2, 3, 3 * i + 1)
-                im1 = plt.imshow(data_error, cmap='gist_earth', interpolation="none", aspect='auto',
-                                origin='lower', extent=bounds)
+                im1 = plt.imshow(data_error, cmap='gist_earth', interpolation="none",
+                                aspect='auto', origin='lower', extent=bounds)
                 plt.colorbar(im1)
-                plt.xlabel('X')
-                plt.ylabel('Y')
                 ax1.set_title("Absolute Error")
+                ax1.set_xlabel('X')
+                ax1.set_ylabel('Y')
 
                 ax2 = plt.subplot(2, 3, 3 * i + 2)
-                im2 = plt.imshow(data_pred, cmap='rainbow', interpolation="none", aspect='auto',
-                                origin='lower', extent=bounds)
+                im2 = plt.imshow(data_pred, cmap='rainbow', interpolation="none",
+                                aspect='auto', origin='lower', extent=bounds)
                 plt.colorbar(im2)
-                plt.xlabel('X')
-                plt.ylabel('Y')
                 ax2.set_title("Predicted Solution")
+                ax2.set_xlabel('X')
+                ax2.set_ylabel('Y')
 
                 ax3 = plt.subplot(2, 3, 3 * i + 3)
-                im3 = plt.imshow(data_test, cmap='rainbow', interpolation="none", aspect='auto',
-                                origin='lower', extent=bounds)
+                im3 = plt.imshow(data_test, cmap='rainbow', interpolation="none",
+                                aspect='auto', origin='lower', extent=bounds)
                 plt.colorbar(im3)
-                plt.xlabel('X')
-                plt.ylabel('Y')
                 ax3.set_title("Reference Solution")
+                ax3.set_xlabel('X')
+                ax3.set_ylabel('Y')
 
-            plt.savefig(save_dir + name)
+            plt.tight_layout()
+            plt.savefig(os.path.join(save_dir, name))
             plt.close()
 
         elif ndim == 3:
-            
-            centers = [center.detach().cpu().numpy() for center in mesh.centers]    
+            centers = [c.detach().cpu().numpy() for c in mesh.centers]
             xmid, ymid, zmid = centers
+            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
             xmin = mesh.xmin.detach().cpu().numpy()
             xmax = mesh.xmax.detach().cpu().numpy()
-            nx, ny, nz = xmid.shape[0], ymid.shape[0], zmid.shape[0]
             bounds = (xmin[0], xmax[0], xmin[1], xmax[1])
+            index_z = nz // 2
 
-            # Sizes for 3D current components
-            sizes = [(nx + 1, ny, nz), (nx, ny + 1, nz), (nx, ny, nz + 1)]
+            # Determine sizes based on meshgrid indexing
+            if index == 'ij':
+                sizes = [(nx + 1, ny, nz), (nx, ny + 1, nz), (nx, ny, nz + 1)]
+                transpose_plot = True
+                order = 'F'
+            elif index == 'xy':
+                sizes = [(ny, nx + 1, nz), (ny + 1, nx, nz), (ny, nx, nz + 1)]
+                transpose_plot = False
+                order = 'C'
+            else:
+                raise ValueError("index must be 'ij' or 'xy'")
 
             P_error = [p_error[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
             P_pred = [p_pred[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
             P_test = [p_test[i].cpu().detach().numpy().reshape(sizes[i], order=order) for i in range(ndim)]
 
-            index_z = nz // 2  # slice in the middle along z-axis
-
             fig = plt.figure(figsize=(20, 10))
-
             for i in range(ndim):
-                # Slice at fixed z-index and transpose if needed
+                # Take middle slice along z
                 slice_error = P_error[i][:, :, index_z]
                 slice_pred = P_pred[i][:, :, index_z]
                 slice_test = P_test[i][:, :, index_z]
 
-                # Transpose for order='F', else no transpose
-                if order == 'F':
+                if transpose_plot:
                     slice_error = slice_error.T
                     slice_pred = slice_pred.T
                     slice_test = slice_test.T
 
                 ax1 = plt.subplot(3, 3, 3 * i + 1)
-                im1 = plt.imshow(slice_error, cmap='gist_earth', interpolation="none", aspect='auto',
-                                origin='lower', extent=bounds)
+                im1 = plt.imshow(slice_error, cmap='gist_earth', interpolation="none",
+                                aspect='auto', origin='lower', extent=bounds)
                 plt.colorbar(im1)
-                plt.xlabel('X')
-                plt.ylabel('Y')
                 ax1.set_title("Absolute Error")
+                ax1.set_xlabel('X')
+                ax1.set_ylabel('Y')
 
                 ax2 = plt.subplot(3, 3, 3 * i + 2)
-                im2 = plt.imshow(slice_pred, cmap='rainbow', interpolation="none", aspect='auto',
-                                origin='lower', extent=bounds)
+                im2 = plt.imshow(slice_pred, cmap='rainbow', interpolation="none",
+                                aspect='auto', origin='lower', extent=bounds)
                 plt.colorbar(im2)
-                plt.xlabel('X')
-                plt.ylabel('Y')
                 ax2.set_title("Predicted Solution")
+                ax2.set_xlabel('X')
+                ax2.set_ylabel('Y')
 
                 ax3 = plt.subplot(3, 3, 3 * i + 3)
-                im3 = plt.imshow(slice_test, cmap='rainbow', interpolation="none", aspect='auto',
-                                origin='lower', extent=bounds)
+                im3 = plt.imshow(slice_test, cmap='rainbow', interpolation="none",
+                                aspect='auto', origin='lower', extent=bounds)
                 plt.colorbar(im3)
-                plt.xlabel('X')
-                plt.ylabel('Y')
                 ax3.set_title("Reference Solution")
+                ax3.set_xlabel('X')
+                ax3.set_ylabel('Y')
 
-            plt.savefig(save_dir + name)
+            plt.tight_layout()
+            plt.savefig(os.path.join(save_dir, name))
             plt.close()
 
+        else:
+            raise ValueError("Only 2D and 3D are supported.")
 
 
 
