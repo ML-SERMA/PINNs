@@ -37,8 +37,8 @@ parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer 
 parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=8000000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[3]+5*[64]+[8])
-parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
-parser.add_argument('-s','--sampling', type=str, help="sampling method",default='random')
+parser.add_argument('-a','--activation', type=str, help="activation function",default='Sin')
+parser.add_argument('-s','--sampling', type=str, help="sampling method",default='Sobol')
 parser.add_argument('-v', '--verbose',action='count', default=0) 
 parser.add_argument("--scaling-loss",dest="scaling_loss",action="store_true",default=True,help="Enable loss scaling")
 parser.add_argument("--no-scaling-loss",dest="scaling_loss",action="store_false",help="Disable loss scaling")
@@ -202,7 +202,7 @@ phi_pred= mypde.unpack_solution(solution)[0]
 mesh = CartesianGeometry(ndim=3,xmin=params_domain['xmin'],xmax=params_domain['xmax'],num_cells=args.n_test)
 visualization.export_flux_list(mesh,phi_pred,filename= save_dir+'flux_data.vtr')
 
-# visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,Error_phi=True,Error_p=True)
+
 visualization.show_loss(pathFile=save_dir+'Loss.csv',save_dir=save_dir,n_phi_groups=ngroup,n_p_groups=ngroup)
 
 for igroup in range(ngroup):
@@ -216,7 +216,7 @@ if show_flux:
     for igroup in range(ngroup):
         visualization.viewErrorAndFlux(mesh,phi_AE[igroup],phi_pred[igroup],phi_test[igroup],
                                         save_dir,'error_phi_group_'+str(igroup)+'.png',index='ij')
-
+    
 show_currents = True
 if show_currents:
     p_AE, p_pred, p_test = mypde.get_currents_test(pdeData.Xc_test,pdeData.p_test,normalization=True,

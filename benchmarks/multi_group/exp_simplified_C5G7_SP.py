@@ -52,7 +52,7 @@ print(f"==>> save_dir: {name_folder}")
 # Check if we run on GPU
 if torch.cuda.is_available():
     device = torch.device('cuda')
-    torch.cuda.set_device(1)
+    torch.cuda.set_device(0)
 else:
     device = torch.device('cpu')
 print(f"Running on {device}. Yes! ")

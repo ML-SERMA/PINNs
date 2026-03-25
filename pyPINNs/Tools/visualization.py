@@ -6,9 +6,12 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.colors as colors
 # import pyvista as pv
-import pyvista as pv
+
 import torch
 import os
+os.environ["PYVISTA_OFF_SCREEN"] = "true"
+import pyvista as pv
+
 class visualization:
     @staticmethod
     def viewGrid(mesh):
@@ -1076,19 +1079,19 @@ class visualization:
 
             fig, axs = plt.subplots(1, 3, figsize=(18, 5))
             im0 = axs[0].imshow(slice_error, cmap='gist_earth', origin='lower', extent=bounds, aspect='auto')
-            axs[0].set_title(f'Absolute Error (slice z={index_z})')
+            axs[0].set_title(f'Absolute Error (slice id_z={index_z})')
             axs[0].set_xlabel('X')
             axs[0].set_ylabel('Y')
             plt.colorbar(im0, ax=axs[0])
 
             im1 = axs[1].imshow(slice_pred, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
-            axs[1].set_title(f'Predicted Flux (slice z={index_z})')
+            axs[1].set_title(f'Predicted Flux (slice id_z={index_z})')
             axs[1].set_xlabel('X')
             axs[1].set_ylabel('Y')
             plt.colorbar(im1, ax=axs[1])
 
             im2 = axs[2].imshow(slice_test, cmap='rainbow', origin='lower', extent=bounds, aspect='auto')
-            axs[2].set_title(f'Reference Flux (slice z={index_z})')
+            axs[2].set_title(f'Reference Flux (slice id_z={index_z})')
             axs[2].set_xlabel('X')
             axs[2].set_ylabel('Y')
             plt.colorbar(im2, ax=axs[2])
@@ -1376,6 +1379,186 @@ class visualization:
         if show:
             plotter.show()
 
+   
+
+
+ 
+    
+
+
+    def plot_flux_slices(mesh, flux_list, filename="flux.png", log_scale=False):
+        """
+        Visualize orthogonal slices using PyVista and save as PNG.
+
+        Args:
+            mesh: object with mesh.edges
+            flux_list: list of flux arrays
+            filename: output PNG file
+            log_scale: apply log10 scaling
+        """
+
+        # --- Convert edges ---
+        edges = []
+        for e in mesh.edges:
+            if torch.is_tensor(e):
+                edges.append(e.detach().cpu().numpy())
+            else:
+                edges.append(np.asarray(e))
+
+        ndims = len(edges)
+
+        if ndims == 2:
+            x_edges, y_edges = edges
+            z_edges = np.array([0, 1])
+        elif ndims == 3:
+            x_edges, y_edges, z_edges = edges
+        else:
+            raise ValueError("Only 2D or 3D supported")
+
+        # --- Create grid ---
+        grid = pv.RectilinearGrid(x_edges, y_edges, z_edges)
+        shape = tuple(len(e) - 1 for e in edges)
+
+        # --- Add flux fields ---
+        for idx, flux in enumerate(flux_list, 1):
+
+            if torch.is_tensor(flux):
+                flux_np = flux.detach().cpu().numpy()
+            else:
+                flux_np = np.asarray(flux)
+
+            phi = flux_np.reshape(shape, order='F')
+
+            if log_scale:
+                phi = np.log10(phi + 1e-10)
+
+            grid.cell_data[f"flux_{idx}"] = phi.flatten(order='F')
+
+        
+        pv.start_xvfb()
+        plotter = pv.Plotter(off_screen=True)
+
+        field = "flux_1"
+
+        # Midpoints
+        xmid = 0.5 * (x_edges[0] + x_edges[-1])
+        ymid = 0.5 * (y_edges[0] + y_edges[-1])
+        zmid = 0.5 * (z_edges[0] + z_edges[-1])
+
+        # Orthogonal slices
+        slices = grid.slice_orthogonal(x=xmid, y=ymid, z=zmid)
+
+        plotter.add_mesh(
+            slices,
+            scalars=field,
+            cmap="jet",
+            show_scalar_bar=True,
+        )
+
+        plotter.add_mesh(grid.outline(), color="black")
+
+        plotter.view_isometric()
+
+        # --- Save PNG ---
+        plotter.screenshot(filename)
+        plotter.close()
+
+        print(f"Saved figure: {filename}")
 
 
 
+    # def plot_flux_isosurfaces(mesh, flux_list, filename="flux_iso.png", log_scale=False):
+    #     """
+    #     Visualize flux using isosurfaces (3D) and save as PNG.
+
+    #     Args:
+    #         mesh: object with mesh.edges
+    #         flux_list: list of flux arrays
+    #         filename: output PNG
+    #         log_scale: apply log10 scaling
+    #     """
+
+    #     # --- Offscreen (cluster safe) ---
+    #     os.environ["PYVISTA_OFF_SCREEN"] = "true"
+
+    #     # --- Convert edges ---
+    #     edges = []
+    #     for e in mesh.edges:
+    #         if torch.is_tensor(e):
+    #             edges.append(e.detach().cpu().numpy())
+    #         else:
+    #             edges.append(np.asarray(e))
+
+    #     ndims = len(edges)
+
+    #     if ndims != 3:
+    #         raise ValueError("Isosurfaces require 3D mesh")
+
+    #     x_edges, y_edges, z_edges = edges
+
+    #     # --- Create grid ---
+    #     grid = pv.RectilinearGrid(x_edges, y_edges, z_edges)
+    #     shape = tuple(len(e) - 1 for e in edges)
+
+    #     # --- Use first flux 
+    #     flux = flux_list[1]
+
+    #     if torch.is_tensor(flux):
+    #         flux_np = flux.detach().cpu().numpy()
+    #     else:
+    #         flux_np = np.asarray(flux)
+
+    #     phi = flux_np.reshape(shape, order='F')
+
+    #     # --- Log scale 
+    #     if log_scale:
+    #         phi = np.log10(phi + 1e-10)
+    #         scalar_name = "flux_log"
+    #     else:
+    #         scalar_name = "flux"
+
+    #     grid.cell_data[scalar_name] = phi.flatten(order='F')
+
+    #     # --- Create plotter ---
+    #     pv.start_xvfb()
+    #     plotter = pv.Plotter(off_screen=True)
+
+    #     # --- Choose isovalues ---
+    #     if log_scale:
+    #         iso_values = np.linspace(phi.max() - 6, phi.max(), 5)
+    #     else:
+    #         iso_values = np.linspace(phi.min(), phi.max(), 5)
+    #     grid = grid.cell_data_to_point_data()
+    #     # --- Compute isosurfaces ---
+    #     contours = grid.contour(
+    #         isosurfaces=iso_values,
+    #         scalars=scalar_name
+    #     )
+
+    #     # --- Add to plot ---
+    #     plotter.add_mesh(
+    #         contours,
+    #         cmap="viridis",
+    #         opacity=0.6,
+    #         show_scalar_bar=True
+    #     )
+
+    #     # Domain outline
+    #     plotter.add_mesh(grid.outline(), color="black")
+
+    #     plotter.view_isometric()
+
+    #     # --- Save ---
+    #     plotter.screenshot(filename)
+    #     plotter.close()
+
+    #     print(f"Saved isosurface figure: {filename}")
+
+
+   
+
+    
+
+  
+
+    

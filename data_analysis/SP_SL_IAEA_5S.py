@@ -22,7 +22,7 @@ print(f"==>> data_dir: {data_dir}")
 
 parser = argparse.ArgumentParser(description='Description of the program')
 parser.add_argument('-t','--test', type=str, help="name of test case",default='IAEA-5S_newGPU')
-parser.add_argument('-l','--loss', type=str, help="name of loss",default='Error_p_global')
+parser.add_argument('-l','--loss', type=str, help="name of loss",default='Error_phi_global')
 args = parser.parse_args()
 
 
@@ -45,12 +45,6 @@ Folders = [ 'Mixed_FCN_IAEA_5S_SLR2e-4_2000_095_HBC_nc10240_nb512_nt[96, 86]_ns2
             ]
 
 legend=['UL-Tanh-Random','SL-Tanh-Random','UL-Sin-Sobol','SL-Sin-Sobol'] 
-
-
-
-
-
-
 
 
 

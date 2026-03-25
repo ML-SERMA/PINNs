@@ -37,8 +37,8 @@ parser.add_argument('-nt','--n_test',nargs='+', type=int, help="list of integer 
 parser.add_argument('-ns','--n_step', type=int, help="an integer number",default=2000000)
 parser.add_argument('-log','--log_every', type=int, help="an integer number",default=100)
 parser.add_argument('-nn','--n_neuron',nargs='+', type=int, help="list of integer number",default=[2]+5*[64]+[6])
-parser.add_argument('-a','--activation', type=str, help="activation function",default='Tanh')
-parser.add_argument('-s','--sampling', type=str, help="sampling method",default='random')
+parser.add_argument('-a','--activation', type=str, help="activation function",default='Sin')
+parser.add_argument('-s','--sampling', type=str, help="sampling method",default='Sobol')
 parser.add_argument('-v', '--verbose',action='count', default=0) 
 parser.add_argument("--scaling-loss",dest="scaling_loss",action="store_true",default=True,help="Enable loss scaling")
 parser.add_argument("--no-scaling-loss",dest="scaling_loss",action="store_false",help="Disable loss scaling")
@@ -56,7 +56,7 @@ print(f"==>> save_dir: {name_folder}")
 # Check if we run on GPU
 if torch.cuda.is_available():
     device = torch.device('cuda')
-    torch.cuda.set_device(1)
+    torch.cuda.set_device(0)
 else:
     device = torch.device('cpu')
 print(f"Running on {device}. Yes! ")
