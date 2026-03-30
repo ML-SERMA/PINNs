@@ -16,15 +16,22 @@ Please make sure you have a miniconda environment installed and the following ne
 ### Experiments:
  The  benchmarks (or experiments) folder has the structure of a python module. Therefore, to run the test case, use the following command
 
+ - The 5-region fixed source problem
+
+```bash
+python -m  benchmarks.one_group.exp_LWR_5S
+
+```
+
 - The simplified C5G7 test case
 
 ```bash
-python -m m benchmarks.multi_group.exp_C5G7_2D
+python -m  benchmarks.multi_group.exp_C5G7_2D
 
 ```
 -The TWIGL 2D test case
 ```bash
-python -m m benchmarks.multi_group.exp_TWIGL_2D
+python -m  benchmarks.multi_group.exp_TWIGL_2D
 
 ```
 We can  also go directly to the folder benchmarks (or experiments) and run the test case as:
