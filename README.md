@@ -1,17 +1,16 @@
 # PINNs
 
-**
-
 ## Authors
 - <a href="https://scholar.google.com/citations?user=azfl46UAAAAJ&hl=en&oi=en/" target="_blank"> Minh Hieu Do </a> (LPEC)
-- 
--
 
 ### Dependencies
-Please make sure you have a miniconda environment installed and the following necessary dependencies (available through pip or conda):
-- <a href="https://pytorch.org/" target="_blank"> pytorch </a>
-- <a href="https://numpy.org/install/" target="_blank"> numpy </a>
-- <a href="https://matplotlib.org/stable/index.html" target="_blank"> matplotlib </a>
+```
+# info for torch : https://pytorch.org/get-started/locally/
+# expl:
+uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+# other dep:
+uv pip install numpy matplotlib torch-summary scipy seaborn plotly pyvista prompt_toolkit tqdm
+```
 
 ### Experiments:
  The  benchmarks (or experiments) folder has the structure of a python module. Therefore, to run the test case, use the following command
