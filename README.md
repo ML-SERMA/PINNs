@@ -3,6 +3,28 @@
 ## Authors
 - <a href="https://scholar.google.com/citations?user=azfl46UAAAAJ&hl=en&oi=en/" target="_blank"> Minh Hieu Do </a> (LPEC)
 
+
+### How to cite
+If you use our code, please cite the companion research papers:
+```bibtex
+@article{
+    authors = {Do, M. H., Madiot, F., Ammar, K., Castaing, N. G.},
+    title = {On Physics-Based Loss Scaling for MF-PINNs applied to the neutron diffusion equation},
+    year = {2026},
+    arxiv = {}
+}
+```
+
+```bibtex
+@inproceedings{
+    authors = {Do, M. H., Ammar, K., Castaing, N. G.,  Madiot, F.},
+    title = {MF-PINNs: Mixed-Formulation Physics-Informed Neural Networks for the multigroup neutron diffusion equations},
+    booktitle={PHYSOR 2026: The International Conference on Physics of Reactors},
+    year = {2026}
+}
+```
+
+
 ### Dependencies
 ```
 # info for torch : https://pytorch.org/get-started/locally/
